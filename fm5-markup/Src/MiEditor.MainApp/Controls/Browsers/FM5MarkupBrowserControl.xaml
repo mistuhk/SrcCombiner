@@ -1,0 +1,87 @@
+
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodel="clr-namespace:WG.MiEditor.MainApp.ViewModels.Browsers"
+             x:DataType="viewmodel:FM5MarkupBrowserViewModel"
+             xmlns:model="clr-namespace:WG.MiEditor.Shared.Models;assembly=MiEditor.Shared"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:convert="clr-namespace:WG.MiEditor.MainApp.Converters"
+             x:Class="WG.MiEditor.MainApp.Controls.Browsers.FM5MarkupBrowserControl">
+
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <convert:EvenOddNumberConverter x:Key="AlternativeRowConverter" />
+            <toolkit:IntToBoolConverter x:Key="IntToBoolConverter" />
+        </ResourceDictionary>
+        <ResourceDictionary Source="/Resources/Styles/Browsers/FM5MarkupBrowserControlStyle.xaml"/>
+    </ContentView.Resources>
+
+    <StackLayout>
+        <StackLayout.Triggers>
+            <DataTrigger TargetType="StackLayout" Binding="{Binding IsBusy}" Value="True">
+                <Setter Property="Opacity" Value="0.5"/>
+            </DataTrigger>
+            <DataTrigger TargetType="StackLayout" Binding="{Binding IsBusy}" Value="False">
+                <Setter Property="Opacity" Value="10"/>
+            </DataTrigger>
+        </StackLayout.Triggers>
+
+        <BoxView HorizontalOptions="Fill" HeightRequest="1" BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}" Margin="0,0,10,5" />
+
+        <ScrollView Style="{StaticResource FM5FeatureContentsScrollViewStyle}">
+            <CollectionView Style="{StaticResource FM5FeatureContentsCollectionViewStyle}">
+                <CollectionView.Header>
+                    <Grid ColumnDefinitions="100,50,50,50,100,100,100,100,100,75,*,75" Padding="0,10,0,10">
+                        <Label Grid.Column="0" Text="ObjectId" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                        <Label Grid.Column="1" Text="Type" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                        <Label Grid.Column="2" Text="Ossheet" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                        <Label Grid.Column="3" Text="Ngfield" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                        <Label Grid.Column="4" Text="MarkupCode" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                        <Label Grid.Column="5" Text="UserArea" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                        <Label Grid.Column="6" Text="FeatureArea" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                        <Label Grid.Column="7" Text="MarkupAction" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                        <Label Grid.Column="8" Text="ChangeType" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                        <Label Grid.Column="9" Text="IsSketch" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                        <Label Grid.Column="10" Text="AdditionalInfo" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                        <Label Grid.Column="11" Text="MultiPartId" Style="{StaticResource FM5FeatureHeaderLabel}"/>
+                    </Grid>
+                </CollectionView.Header>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="model:FM5MarkupModel">
+                        <Grid ColumnDefinitions="100,50,50,50,100,100,100,100,100,75,*,75">
+                            <Grid.Triggers>
+                                <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="1">
+                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}" />
+                                </DataTrigger>
+                                <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="0">
+                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
+                                </DataTrigger>
+
+                                <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
+                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SubformBackgroundLight}, Dark={StaticResource SubformBackgroundDark}}"/>
+                                </DataTrigger>
+                            </Grid.Triggers>
+
+                            <Label Grid.Column="0" Text="{Binding ObjectId}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            <Label Grid.Column="1" Text="{Binding Type}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            <Label Grid.Column="2" Text="{Binding Ossheet}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            <Label Grid.Column="3" Text="{Binding Ngfield}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            <Label Grid.Column="4" Text="{Binding MarkupCode}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            <Label Grid.Column="5" Text="{Binding UserArea}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            <Label Grid.Column="6" Text="{Binding FeatureArea}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            <Label Grid.Column="7" Text="{Binding MarkupAction}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            <Label Grid.Column="8" Text="{Binding ChangeType}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            <Label Grid.Column="9" Text="{Binding IsSketch}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            <Label Grid.Column="10" Text="{Binding AdditionalInfo}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            <Label Grid.Column="11" Text="{Binding MultiPartId}" Style="{StaticResource FM5FeatureDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </ScrollView>
+
+        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" VerticalOptions="Center" Margin="0,-100,0,0" />
+    </StackLayout>
+
+</ContentView>

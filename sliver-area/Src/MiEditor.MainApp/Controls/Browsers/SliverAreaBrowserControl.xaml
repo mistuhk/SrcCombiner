@@ -1,0 +1,93 @@
+
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodel="clr-namespace:WG.MiEditor.MainApp.ViewModels.Browsers"
+             x:DataType="viewmodel:SliverAreaBrowserViewModel"
+             xmlns:model="clr-namespace:WG.MiEditor.Shared.Models;assembly=MiEditor.Shared"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:convert="clr-namespace:WG.MiEditor.MainApp.Converters"
+             x:Class="WG.MiEditor.MainApp.Controls.Browsers.SliverAreaBrowserControl">
+
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <toolkit:IntToBoolConverter x:Key="IntToBoolConverter" />
+            <convert:EvenOddNumberConverter x:Key="AlternativeRowConverter" />
+        </ResourceDictionary>
+        <ResourceDictionary Source="/Resources/Styles/Browsers/SliverAreaBrowserControl.xaml"/>
+    </ContentView.Resources>
+    
+    <StackLayout>
+        <StackLayout.Triggers>
+            <DataTrigger TargetType="StackLayout" Binding="{Binding IsBusy}" Value="True">
+                <Setter Property="Opacity" Value="0.5"/>
+            </DataTrigger>
+            <DataTrigger TargetType="StackLayout" Binding="{Binding IsBusy}" Value="False">
+                <Setter Property="Opacity" Value="10"/>
+            </DataTrigger>
+        </StackLayout.Triggers>
+        
+        <BoxView HorizontalOptions="Fill" HeightRequest="1" BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}" Margin="0,0,10,5" />
+        
+        <Grid ColumnDefinitions="*,5,0.25*">
+            <StackLayout Grid.Column="0" IsVisible="{Binding IsSliverAreaBrowserVisible}">
+                <ScrollView Style="{StaticResource SliverAreaContentScrollViewStyle}">
+                    <CollectionView Style="{StaticResource SliverAreaContentCollectionViewStyle}">
+                        <CollectionView.Header>
+                            <Grid ColumnDefinitions="100,100,200,100">
+                                <Label Grid.Column="0" Text="OBJECTID" Style="{StaticResource SliverAreaHeaderLabel}" />
+                                <Label Grid.Column="1" Text="POLYGONID" Style="{StaticResource SliverAreaHeaderLabel}" />
+                                <Label Grid.Column="2" Text="SHAPE AREA" Style="{StaticResource SliverAreaHeaderLabel}" />
+                                <Label Grid.Column="3" Text="{Binding AreaColumnHeader}" Style="{StaticResource SliverAreaHeaderLabel}" />
+                            </Grid>
+                        </CollectionView.Header>
+
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="model:SliverAreaModel">
+                                <Grid ColumnDefinitions="100,100,200,100">
+                                    <Grid.Triggers>
+                                        <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="1">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="0">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
+                                        </DataTrigger>
+
+                                        <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SubformBackgroundLight}, Dark={StaticResource SubformBackgroundDark}}"/>
+                                        </DataTrigger>
+                                    </Grid.Triggers>
+
+                                    <Label Grid.Column="0" Text="{Binding ObjectId}" Style="{StaticResource SliverAreaDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}" />
+                                    <Label Grid.Column="1" Text="{Binding PolygonId}" Style="{StaticResource SliverAreaDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}" />
+                                    <Label Grid.Column="2" Text="{Binding ShapeArea}" Style="{StaticResource SliverAreaDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}" />
+                                    <Label Grid.Column="3" Text="{Binding Area}" Style="{StaticResource SliverAreaDataLabel}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </ScrollView>
+            </StackLayout>
+
+            <BoxView Grid.Row="0" Grid.Column="1" WidthRequest="1" BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}" HeightRequest="190" VerticalOptions="Fill" />
+            
+            <VerticalStackLayout Grid.Row="0" Grid.Column="2" Spacing="5" Margin="5,0,5,0">
+                <Label Style="{StaticResource SliverLayerPickerLabelStyle}" />
+                <Picker Style="{StaticResource SliverLayerPickerStyle}">
+                    <Picker.Behaviors>
+                        <toolkit:EventToCommandBehavior EventName="SelectedIndexChanged"
+                            Command="{Binding LayerSelectionChangedCommand}"
+                            CommandParameter="{Binding SelectedLayer}" />
+                    </Picker.Behaviors>
+                </Picker>
+            </VerticalStackLayout>
+        </Grid>
+        
+        <ActivityIndicator
+            IsRunning="{Binding IsBusy}"
+            IsVisible="{Binding IsBusy}"
+            HorizontalOptions="Center"
+            VerticalOptions="Center" Margin="0,-100,0,0" />
+        
+    </StackLayout>
+</ContentView>

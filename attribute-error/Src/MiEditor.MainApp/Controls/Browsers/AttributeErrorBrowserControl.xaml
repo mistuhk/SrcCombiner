@@ -1,0 +1,125 @@
+
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodel="clr-namespace:WG.MiEditor.MainApp.ViewModels.Browsers"
+             x:DataType="viewmodel:AttributeErrorBrowserViewModel"
+             xmlns:model="clr-namespace:WG.MiEditor.Shared.Models.HealthCheck;assembly=MiEditor.Shared"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:convert="clr-namespace:WG.MiEditor.MainApp.Converters"
+             x:Class="WG.MiEditor.MainApp.Controls.Browsers.AttributeErrorBrowserControl">
+
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <convert:BooleanToColorConverter x:Key="BooleanToColorConverter" FalseColor="Red" TrueColor="Black" />
+            <convert:EvenOddNumberConverter x:Key="AlternativeRowConverter" />
+        </ResourceDictionary>
+        <ResourceDictionary Source="/Resources/Styles/Browsers/AttributeErrorBrowserControlStyle.xaml"/>
+    </ContentView.Resources>
+    
+    <StackLayout>
+        <Label IsVisible="{Binding IsNoDataVisible}" Text="No data." TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+        
+        <BoxView Style="{StaticResource AttributeChecksTopBoxViewtyle}"/>
+        
+        <StackLayout IsVisible="{Binding IsAttributeErrorsDataVisible}">
+            <Grid Style="{StaticResource AttributeChecksMainGridStyle}">
+                <StackLayout Grid.Column="0">
+                    <ScrollView Style="{StaticResource AttributeChecksScrollViewStyle}">
+                        <CollectionView Style="{StaticResource HealthChecksCollectionViewStyle}">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="model:HealthCheck">
+                                    <Grid ColumnDefinitions="*">
+                                        <Grid.GestureRecognizers>
+                                            <TapGestureRecognizer
+                                                Command="{Binding BindingContext.ShowHealthCheckErrorsCommand, Source={RelativeSource AncestorType={x:Type CollectionView}}}"
+                                                CommandParameter="{Binding}"/>
+                                        </Grid.GestureRecognizers>
+                                        <Grid.Triggers>
+                                            <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SubformBackgroundLight}, Dark={StaticResource SubformBackgroundDark}}"/>
+                                            </DataTrigger>
+                                            <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="False">
+                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"/>
+                                            </DataTrigger>
+                                        </Grid.Triggers>
+                                        
+                                        <Label
+                                            Style="{StaticResource AttributeChecksLableStyle}"
+                                            Text="{Binding Value}"
+                                            TextColor="{Binding IsByPassable, Converter={StaticResource BooleanToColorConverter}}"/>
+                                    </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                    </ScrollView>
+                </StackLayout>
+
+                <!-- Vertical Line -->
+                <BoxView Style="{StaticResource AttributeChecksVerticalBoxViewtyle}" />
+
+                <StackLayout Grid.Column="2" Margin="5,0,0,0">
+                    <Grid RowDefinitions="Auto,Auto" Padding="0,0,10,0">
+                        <HorizontalStackLayout Style="{StaticResource HealthCheckDetailsHeadingStyle}">
+                            <Border Style="{StaticResource HealthCheckDetailsHeadingBorderStyle}">
+                                <Label Text="{Binding IsByPassableText}" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+
+                        <ScrollView Style="{StaticResource HealthCheckDetailsScrollViewStyle}">
+                            <CollectionView Style="{StaticResource HealthCheckDetailsCollectionViewStyle}">
+                                <CollectionView.Header>
+                                    <Grid Style="{StaticResource HealthCheckDetailsCollectionViewHeaderGridStyle}">
+                                        <Label Grid.Column="0" Text="{Binding HealthCheckHeaders.HealthCheckField1.Label}" IsVisible="{Binding HealthCheckHeaders.HealthCheckField1.IsVisible}" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                        <Label Grid.Column="1" Text="{Binding HealthCheckHeaders.HealthCheckField2.Label}" IsVisible="{Binding HealthCheckHeaders.HealthCheckField2.IsVisible}" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                        <Label Grid.Column="2" Text="{Binding HealthCheckHeaders.HealthCheckField3.Label}" IsVisible="{Binding HealthCheckHeaders.HealthCheckField3.IsVisible}" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                        <Label Grid.Column="3" Text="{Binding HealthCheckHeaders.HealthCheckField4.Label}" IsVisible="{Binding HealthCheckHeaders.HealthCheckField4.IsVisible}" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                        <Label Grid.Column="4" Text="{Binding HealthCheckHeaders.HealthCheckField5.Label}" IsVisible="{Binding HealthCheckHeaders.HealthCheckField5.IsVisible}" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                        <Label Grid.Column="5" Text="{Binding HealthCheckHeaders.HealthCheckField6.Label}" IsVisible="{Binding HealthCheckHeaders.HealthCheckField6.IsVisible}" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                        <Label Grid.Column="6" Text="{Binding HealthCheckHeaders.HealthCheckField7.Label}" IsVisible="{Binding HealthCheckHeaders.HealthCheckField7.IsVisible}" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                        <Label Grid.Column="7" Text="{Binding HealthCheckHeaders.HealthCheckField8.Label}" IsVisible="{Binding HealthCheckHeaders.HealthCheckField8.IsVisible}" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                        <Label Grid.Column="8" Text="{Binding HealthCheckHeaders.HealthCheckField9.Label}" IsVisible="{Binding HealthCheckHeaders.HealthCheckField9.IsVisible}" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                    </Grid>
+                                </CollectionView.Header>
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="model:HealthCheckDetail">
+                                        <Grid Style="{StaticResource HealthCheckDetailsCollectionViewDataGridStyle}">
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding BindingContext.ZoomToHeathCheckFeatureCommand, Source={RelativeSource AncestorType={x:Type CollectionView}}}"
+                                                    CommandParameter="{Binding}"/>
+                                            </Grid.GestureRecognizers>
+                                            <Grid.Triggers>
+
+                                                <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="1">
+                                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}" />
+                                                </DataTrigger>
+                                                <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="0">
+                                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
+                                                </DataTrigger>
+
+                                                <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SubformBackgroundLight}, Dark={StaticResource SubformBackgroundDark}}"/>
+                                                </DataTrigger>
+                                            </Grid.Triggers>
+
+                                            <Label Grid.Column="0" Text="{Binding HealthCheckField1.Value}" IsVisible="{Binding HealthCheckField1.IsVisible}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                            <Label Grid.Column="1" Text="{Binding HealthCheckField2.Value}" IsVisible="{Binding HealthCheckField2.IsVisible}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                            <Label Grid.Column="2" Text="{Binding HealthCheckField3.Value}" IsVisible="{Binding HealthCheckField3.IsVisible}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                            <Label Grid.Column="3" Text="{Binding HealthCheckField4.Value}" IsVisible="{Binding HealthCheckField4.IsVisible}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                            <Label Grid.Column="4" Text="{Binding HealthCheckField5.Value}" IsVisible="{Binding HealthCheckField5.IsVisible}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                            <Label Grid.Column="5" Text="{Binding HealthCheckField6.Value}" IsVisible="{Binding HealthCheckField6.IsVisible}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                            <Label Grid.Column="6" Text="{Binding HealthCheckField7.Value}" IsVisible="{Binding HealthCheckField7.IsVisible}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                            <Label Grid.Column="7" Text="{Binding HealthCheckField8.Value}" IsVisible="{Binding HealthCheckField8.IsVisible}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                            <Label Grid.Column="8" Text="{Binding HealthCheckField9.Value}" IsVisible="{Binding HealthCheckField9.IsVisible}" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </ScrollView>
+                    </Grid>
+                </StackLayout>
+            </Grid>
+        </StackLayout>
+    </StackLayout>
+</ContentView>

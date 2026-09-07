@@ -1,0 +1,91 @@
+
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodel="clr-namespace:WG.MiEditor.MainApp.ViewModels.Browsers"
+             x:DataType="viewmodel:TopologicalChecksBrowserViewModel"
+             xmlns:model="clr-namespace:WG.MiEditor.Models.Topological;assembly=MiEditor.Shared"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:convert="clr-namespace:WG.MiEditor.MainApp.Converters"
+             x:Class="WG.MiEditor.MainApp.Controls.Browsers.TopologicalChecksBrowserControl">
+
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <toolkit:IntToBoolConverter x:Key="IntToBoolConverter" />
+            <convert:EvenOddNumberConverter x:Key="AlternativeRowConverter" />
+        </ResourceDictionary>
+        <ResourceDictionary Source="/Resources/Styles/Browsers/TopologicalChecksBrowserControlStyle.xaml"/>
+    </ContentView.Resources>
+    
+    <StackLayout>
+        <StackLayout HorizontalOptions="Fill" VerticalOptions="Fill">
+            <StackLayout.Triggers>
+                <DataTrigger TargetType="StackLayout" Binding="{Binding IsBusy}" Value="True">
+                    <Setter Property="Opacity" Value="0.5"/>
+                </DataTrigger>
+                <DataTrigger TargetType="StackLayout" Binding="{Binding IsBusy}" Value="False">
+                    <Setter Property="Opacity" Value="10"/>
+                </DataTrigger>
+            </StackLayout.Triggers>
+            
+            <Label Style="{StaticResource TopologicalChecksTotalCountStyle}"/>
+
+            <BoxView Style="{StaticResource TopologicalChecksLabelBoxViewtyle}"/>
+
+            <ScrollView Style="{StaticResource TopologicalCheckBrowserScrollViewStyle}">
+                <CollectionView Style="{StaticResource TopologicalCheckBrowserCollectionViewStyle}">
+
+                    <CollectionView.Header>
+                        <Grid Style="{StaticResource TopologicalCheckCollectionViewHeaderGridStyle}">
+                            <Label Text="Index" Grid.Column="0" Style="{StaticResource TopologicalCheckCollectionViewHeaderLabelStyle}"/>
+                            <Label Text="OriginFeatureId" Grid.Column="1" Style="{StaticResource TopologicalCheckCollectionViewHeaderLabelStyle}"/>
+                            <Label Text="DestinationFeatureId" Grid.Column="2" Style="{StaticResource TopologicalCheckCollectionViewHeaderLabelStyle}"/>
+                            <Label Text="ErrorType" Grid.Column="3" Style="{StaticResource TopologicalCheckCollectionViewHeaderLabelStyle}"/>                            
+                            <Label Text="OriginFeatureClassName" Grid.Column="4" Style="{StaticResource TopologicalCheckCollectionViewHeaderLabelStyle}"/>                            
+                            <Label Text="DestFeatureClassName" Grid.Column="5" Style="{StaticResource TopologicalCheckCollectionViewHeaderLabelStyle}"/>
+                            <Label Text="Area [Sq. Meter]" Grid.Column="6" Style="{StaticResource TopologicalCheckCollectionViewHeaderLabelStyle}"/>                            
+                            <Label Text="PolyId" Grid.Column="7" Style="{StaticResource TopologicalCheckCollectionViewHeaderLabelStyle}"/>
+                            <Label Text="LpisPolyId" Grid.Column="8" Style="{StaticResource TopologicalCheckCollectionViewHeaderLabelStyle}"/>
+                        </Grid>
+                    </CollectionView.Header>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="model:TopologicalError">
+                            <Grid Style="{StaticResource TopologicalCheckCollectionViewDataGridStyle}">
+                                <Grid.Triggers>
+
+                                    <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="1">
+                                        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="0">
+                                        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
+                                    </DataTrigger>
+
+                                    <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SubformBackgroundLight}, Dark={StaticResource SubformBackgroundDark}}"/>
+                                    </DataTrigger>
+                                </Grid.Triggers>
+
+                                <Label Text="{Binding Index}" Grid.Column="0" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                <Label Text="{Binding OriginFeatureId}" Grid.Column="1" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                <Label Text="{Binding DestinationFeatureId}" Grid.Column="2" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                <Label Text="{Binding RuleType}" Grid.Column="3" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>                                
+                                <Label Text="{Binding OriginFeatureClassName}" Grid.Column="4" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>                                
+                                <Label Text="{Binding DestFeatureClassName}" Grid.Column="5" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                <Label Text="{Binding Area, StringFormat='{0:F6}'}" Grid.Column="6" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>                                
+                                <Label Text="{Binding PolyId}" Grid.Column="7" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                <Label Text="{Binding LpisPolyId}" Grid.Column="8" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </ScrollView>
+        </StackLayout>
+
+        <ActivityIndicator
+            IsRunning="{Binding IsBusy}"
+            IsVisible="{Binding IsBusy}"
+            HorizontalOptions="Center"
+            VerticalOptions="Center" Margin="0,-100,0,0" /> 
+    </StackLayout>
+    
+</ContentView>

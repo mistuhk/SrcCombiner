@@ -1,0 +1,78 @@
+
+<?xml version="1.0" encoding="utf-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+
+    <Style x:Key="QaAttributeBrowserLabelBoxViewtyle" TargetType="BoxView">
+        <Setter Property="HorizontalOptions" Value="Fill"/>
+        <Setter Property="HeightRequest" Value="1"/>
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}"/>
+        <Setter Property="Margin" Value="0,0,10,0"/>
+    </Style>
+
+
+    <Style x:Key="QaAttributeBrowserLabelStyle" TargetType="Label">
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+    </Style>
+    <Style x:Key="QaAttributeBrowserTotalDeductionLabelStyle" TargetType="Label">
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+    </Style>
+    <Style x:Key="QaAttributeBrowserSelectedLayerLabelStyle" TargetType="Label">
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+    </Style>
+
+    <Style x:Key="QaAttributeBrowserScrollViewStyle" TargetType="ScrollView">
+        <Setter Property="Orientation" Value="Both"/>
+        <Setter Property="HorizontalOptions" Value="Fill"/>
+        <Setter Property="HeightRequest" Value="180"/>
+        <Setter Property="Margin" Value="0,5,0,0"/>        
+    </Style>
+
+    <Style x:Key="QaAttributeBrowserLayrInfoScrollViewStyle" TargetType="ScrollView">
+        <Setter Property="Orientation" Value="Both"/>
+        <Setter Property="HorizontalOptions" Value="Fill"/>
+        <Setter Property="HeightRequest" Value="140"/>
+        <Setter Property="Margin" Value="0,5,0,0"/>
+    </Style>
+
+
+    <Style x:Key="QaAttributeBrowserCollectionViewStyle" TargetType="CollectionView">
+        <Setter Property="Grid.Row" Value="0"/>
+        <Setter Property="Margin" Value="0,0,10,0"/>
+        <Setter Property="HorizontalScrollBarVisibility" Value="Always"/>
+        <Setter Property="VerticalScrollBarVisibility" Value="Always"/>
+        <Setter Property="SelectionMode" Value="Single"/>
+        <Setter Property="ItemsSource" Value="{Binding LpisParcels}"/>
+        <Setter Property="SelectedItem" Value="{Binding SelectedItem, Mode=TwoWay}"/>
+        <Setter Property="SelectionChangedCommand" Value="{Binding ItemSelectedCommand}"/>
+    </Style>
+
+    <Style x:Key="QaAttributeBrowserCollectionViewHeaderGridStyle" TargetType="Grid">
+        <Setter Property="Grid.ColumnDefinitions" Value="80,120,120,120,120,140,130,120,130,100"/>
+        <Setter Property="Padding" Value="0,10,0,10"/>
+    </Style>
+    <Style x:Key="QaAttributeBrowserCollectionViewHeaderLabelStyle" TargetType="Label">
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+    </Style>
+
+    <Style x:Key="QaAttributeBrowserCollectionViewDataGridStyle" TargetType="Grid">
+        <Setter Property="Grid.ColumnDefinitions" Value="80,120,120,120,120,140,130,120,130,100"/>
+        <Setter Property="Padding" Value="0,5,0,5"/>
+    </Style>
+
+    <Style x:Key="QaAttributeLayerPickerStyle" TargetType="Picker">
+        <Setter Property="Margin" Value="10,5,0,0"/>
+        <Setter Property="WidthRequest" Value="200"/>
+        <Setter Property="HorizontalOptions" Value="Start"/>
+        <Setter Property="ItemsSource" Value="{Binding RelatedLayers}"/>
+        <Setter Property="SelectedItem" Value="{Binding SelectedLayer, Mode=TwoWay}"/>
+    </Style>
+</ResourceDictionary>

@@ -1,0 +1,92 @@
+
+<?xml version="1.0" encoding="utf-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <Style x:Key="AttributeChecksTopBoxViewtyle" TargetType="BoxView">
+        <Setter Property="HorizontalOptions" Value="Fill"/>
+        <Setter Property="HeightRequest" Value="1"/>
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}"/>
+        <Setter Property="Margin" Value="0,0,10,0"/>
+    </Style>
+
+    <Style x:Key="AttributeChecksMainGridStyle" TargetType="Grid">
+        <Setter Property="Grid.ColumnDefinitions" Value="300,5,*"/>
+        <Setter Property="Padding" Value="0,5,0,0"/>
+    </Style>
+
+    <Style x:Key="AttributeChecksScrollViewStyle" TargetType="ScrollView">
+        <Setter Property="Orientation" Value="Vertical"/>
+        <Setter Property="VerticalOptions" Value="Fill"/>
+        <Setter Property="HeightRequest" Value="190"/>
+        <Setter Property="Padding" Value="0,0,10,0"/>
+    </Style>
+
+    <Style x:Key="AttributeChecksLableStyle" TargetType="Label">
+        <Setter Property="Grid.Column" Value="0"/>
+        <Setter Property="LineBreakMode" Value="WordWrap"/>
+        <Setter Property="MaxLines" Value="5"/>
+        <Setter Property="VerticalOptions" Value="Start"/>
+        <Setter Property="HorizontalOptions" Value="Fill"/>
+        <Setter Property="Padding" Value="0,5,0,5"/>
+    </Style>
+
+    <Style x:Key="AttributeChecksVerticalBoxViewtyle" TargetType="BoxView">
+        <Setter Property="Grid.Column" Value="1"/>
+        <Setter Property="WidthRequest" Value="1"/>
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}"/>
+        <Setter Property="VerticalOptions" Value="Fill"/>
+    </Style>
+
+    <Style x:Key="HealthChecksCollectionViewStyle" TargetType="CollectionView">
+        <Setter Property="ItemsSource" Value="{Binding HealthChecks}"/>
+        <Setter Property="SelectionMode" Value="Single"/>        
+    </Style>
+
+    <Style x:Key="HealthCheckDetailsHeadingStyle" TargetType="HorizontalStackLayout">
+        <Setter Property="Grid.Column" Value="2"/>
+        <Setter Property="HorizontalOptions" Value="End"/>
+    </Style>
+
+    <Style x:Key="HealthCheckDetailsHeadingBorderStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"/>
+        <Setter Property="Padding" Value="15,5,15,5"/>
+        <Setter Property="Margin" Value="10,0,0,0"/>
+        <Style.Triggers>
+            <DataTrigger TargetType="Border" Binding="{Binding SelectedHealthCheck.IsByPassable}" Value="False">
+                <Setter Property="Stroke" Value="{StaticResource ErrorBrush}"/>
+            </DataTrigger>
+            <DataTrigger TargetType="Border" Binding="{Binding SelectedHealthCheck.IsByPassable}" Value="True">
+                <Setter Property="Stroke" Value="{StaticResource BorderStrongBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="HealthCheckDetailsScrollViewStyle" TargetType="ScrollView">
+        <Setter Property="Grid.Row" Value="1"/>
+        <Setter Property="Orientation" Value="Both"/>
+        <Setter Property="HorizontalOptions" Value="Fill"/>
+        <Setter Property="VerticalOptions" Value="Fill"/>
+        <Setter Property="HeightRequest" Value="190"/>
+        <Setter Property="Padding" Value="0,0,0,0"/>
+    </Style>
+
+    <Style x:Key="HealthCheckDetailsCollectionViewStyle" TargetType="CollectionView">
+        <Setter Property="ItemsSource" Value="{Binding HealthCheckDetails}"/>
+        <Setter Property="SelectionMode" Value="Single"/>
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"/>
+    </Style>
+
+    <Style x:Key="HealthCheckDetailsCollectionViewGridBaseStyle" TargetType="Grid">
+        <Setter Property="ColumnDefinitions" Value="100,100,100,100,100,100,100,100,100"/>
+    </Style>
+
+    <Style x:Key="HealthCheckDetailsCollectionViewHeaderGridStyle" TargetType="Grid" BaseResourceKey="HealthCheckDetailsCollectionViewGridBaseStyle">
+        <Setter Property="Padding" Value="0,10,0,10"/>
+    </Style>
+
+    <Style x:Key="HealthCheckDetailsCollectionViewDataGridStyle" TargetType="Grid" BaseResourceKey="HealthCheckDetailsCollectionViewGridBaseStyle">
+        <Setter Property="Padding" Value="0,5,0,5"/>
+    </Style>
+
+</ResourceDictionary>

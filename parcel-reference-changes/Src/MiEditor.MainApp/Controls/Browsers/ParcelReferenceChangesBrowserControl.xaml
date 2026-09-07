@@ -1,0 +1,161 @@
+
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"             
+             xmlns:viewmodel="clr-namespace:WG.MiEditor.MainApp.ViewModels.Browsers"
+             x:DataType="viewmodel:ParcelReferenceChangesBrowserViewModel"
+             xmlns:model="clr-namespace:WG.MiEditor.Shared.Models.PRC;assembly=MiEditor.Shared"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:convert="clr-namespace:WG.MiEditor.MainApp.Converters"
+             x:Class="WG.MiEditor.MainApp.Controls.Browsers.ParcelReferenceChangesBrowserControl"
+             x:Name="PrcRoot">
+    
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <convert:EvenOddNumberConverter x:Key="AlternativeRowConverter" />
+        </ResourceDictionary>
+    </ContentView.Resources>
+
+    <StackLayout>
+        <StackLayout.Triggers>
+            <DataTrigger TargetType="StackLayout" Binding="{Binding IsBusy}" Value="True">
+                <Setter Property="Opacity" Value="0.5"/>
+            </DataTrigger>
+            <DataTrigger TargetType="StackLayout" Binding="{Binding IsBusy}" Value="False">
+                <Setter Property="Opacity" Value="10"/>
+            </DataTrigger>
+        </StackLayout.Triggers>
+        
+        <BoxView
+            HorizontalOptions="Fill"
+            HeightRequest="1"
+            BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}"
+            Margin="0,0,10,5" />
+
+        <Grid ColumnDefinitions="*,5,0.25*">
+            <StackLayout Grid.Row="0" Grid.Column="0">
+                <Grid ColumnDefinitions="75,5,*">
+                    <StackLayout Grid.Column="0">
+                        <ScrollView Orientation="Vertical" VerticalOptions="Fill" HeightRequest="190" Padding="0,0,10,0">
+                            <CollectionView ItemsSource="{Binding ParclReferenceChangeGroups}" SelectionMode="Single">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="model:PrcGroup">
+                                        <Grid ColumnDefinitions="*">
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding BindingContext.ShowParcelReferenceChangesCommand, Source={RelativeSource AncestorType={x:Type CollectionView}}}"
+                                                    CommandParameter="{Binding}"/>
+                                            </Grid.GestureRecognizers>
+                                            <Grid.Triggers>
+                                                <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SubformBackgroundLight}, Dark={StaticResource SubformBackgroundDark}}"/>
+                                                </DataTrigger>
+                                                <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="False">
+                                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"/>
+                                                </DataTrigger>
+                                            </Grid.Triggers>
+                                            
+                                            <Label
+                                                Grid.Column="0"
+                                                VerticalOptions="Start"
+                                                HorizontalOptions="Fill"
+                                                Padding="0,5,0,5"
+                                                TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                                Text="{Binding GroupName}" />
+                                        </Grid>                                        
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </ScrollView>
+                    </StackLayout>                    
+                    
+                    <!-- Vertical Line -->
+                    <BoxView Grid.Column="1" WidthRequest="1" BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}" VerticalOptions="Fill" />
+
+                    <HorizontalStackLayout 
+                        Grid.Column="2"
+                        HorizontalOptions="Center"
+                        VerticalOptions="Center"
+                        IsVisible="{Binding IsClearPrcAnalysisButtonEnabled, Converter={StaticResource InverseBooleanConverter}}">
+                        <Label Text="No Data" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                    </HorizontalStackLayout>
+
+                    <StackLayout Grid.Column="2" Margin="5,0,0,0" IsVisible="{Binding IsClearPrcAnalysisButtonEnabled}">
+                        <ScrollView Orientation="Both" HorizontalOptions="Fill" VerticalOptions="Fill" HeightRequest="190" Padding="0,0,0,0">
+                            <CollectionView ItemsSource="{Binding ParclReferenceChangeAnalysis}" SelectionMode="None" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}">
+                                <CollectionView.Header>
+                                    <Grid ColumnDefinitions="40,*,*,*,*,*" Padding="0,10,0,10">
+                                        <Label Grid.Column="1" Text="SourceReference" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"  FontAttributes="Bold"/>
+                                        <Label Grid.Column="2" Text="SourceValidFrom" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"  FontAttributes="Bold"/>
+                                        <Label Grid.Column="3" Text="TargetReference" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"  FontAttributes="Bold"/>
+                                        <Label Grid.Column="4" Text="ValidFrom" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"  FontAttributes="Bold"/>
+                                        <Label Grid.Column="5" Text="UserConfirmation" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"  FontAttributes="Bold"/>
+                                    </Grid>
+                                </CollectionView.Header>
+                                
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="model:PrcAnalysis">
+                                        <Grid ColumnDefinitions="40,*,*,*,*,*">                                            
+
+                                            <Grid.Triggers>
+                                                <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="1">
+                                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}" />
+                                                </DataTrigger>
+                                                <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="0">
+                                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
+                                                </DataTrigger>
+                                            </Grid.Triggers>
+
+                                            <Label Grid.Column="1" Text="{Binding SourceReference}" VerticalTextAlignment="Center" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                            <Label Grid.Column="2" Text="{Binding SourceValidFrom}" VerticalTextAlignment="Center" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                            <Label Grid.Column="3" Text="{Binding TargetReference}" VerticalTextAlignment="Center" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}">
+                                                <Label.GestureRecognizers>
+                                                    <TapGestureRecognizer
+                                                        Command="{Binding BindingContext.ZoomToParcelCommand, Source={RelativeSource AncestorType={x:Type CollectionView}}}"
+                                                        CommandParameter="{Binding}"/>
+                                                </Label.GestureRecognizers>
+                                            </Label>
+
+                                            <DatePicker Grid.Column="4" Date="{Binding ValidFrom, Mode=TwoWay}" HorizontalOptions="Start">                                                
+                                                <DatePicker.Behaviors>
+                                                    <toolkit:EventToCommandBehavior
+                                                        EventName="DateSelected"
+                                                        Command="{Binding Source={x:Reference PrcRoot}, Path=BindingContext.SavePrcAnalysisCommand}"
+                                                        CommandParameter="{Binding}"/>
+                                                </DatePicker.Behaviors>
+                                            </DatePicker>
+                                            
+                                            <Picker Grid.Column="5" ItemsSource="{Binding UserConfirmation}" SelectedItem="{Binding SelectedUserConfirmation, Mode=TwoWay}">
+                                                <Picker.Behaviors>
+                                                    <toolkit:EventToCommandBehavior
+                                                        EventName="SelectedIndexChanged"
+                                                        Command="{Binding Source={x:Reference PrcRoot}, Path=BindingContext.SavePrcAnalysisCommand}"
+                                                        CommandParameter="{Binding}"/>
+                                                </Picker.Behaviors>
+                                            </Picker>
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </ScrollView>
+                    </StackLayout>
+                </Grid>
+            </StackLayout>
+
+            <BoxView Grid.Row="0" Grid.Column="1" WidthRequest="1" BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}" VerticalOptions="Fill" />
+            
+            <VerticalStackLayout Grid.Row="0" Grid.Column="2" Spacing="5" Margin="5,0,5,0">
+                <Button Text="Run Paracel Analysis" Style="{StaticResource BtnPrimary}" Command="{Binding RunPrcAnalysisCommand}" />
+                <Button Text="Clear Previous Analysis" Style="{StaticResource BtnPrimary}" Command="{Binding ClearPreviousAnalysisCommand}" IsEnabled="{Binding IsClearPrcAnalysisButtonEnabled}"/>
+            </VerticalStackLayout>
+            
+        </Grid>
+
+        <ActivityIndicator
+            IsRunning="{Binding IsBusy}"
+            IsVisible="{Binding IsBusy}"
+            HorizontalOptions="Center"
+            VerticalOptions="Center" Margin="0,-100,0,0" />
+        
+    </StackLayout>
+</ContentView>

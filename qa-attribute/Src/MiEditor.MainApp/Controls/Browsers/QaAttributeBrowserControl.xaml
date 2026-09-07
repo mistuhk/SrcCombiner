@@ -1,0 +1,196 @@
+
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                 xmlns:viewmodel="clr-namespace:WG.MiEditor.MainApp.ViewModels.Browsers"
+                 x:DataType="viewmodel:QaAttributeBrowserViewModel"
+                 xmlns:model="clr-namespace:WG.MiEditor.Models;assembly=MiEditor.Shared"
+                 xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+                 xmlns:convert="clr-namespace:WG.MiEditor.MainApp.Converters"
+                 xmlns:behaviors="clr-namespace:WG.MiEditor.MainApp.Behaviours"
+                 x:Class="WG.MiEditor.MainApp.Controls.Browsers.QaAttributeBrowserControl">
+
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <toolkit:IntToBoolConverter x:Key="IntToBoolConverter" />
+            <convert:EvenOddNumberConverter x:Key="AlternativeRowConverter" />
+        </ResourceDictionary>
+        <ResourceDictionary Source="/Resources/Styles/Browsers/QaAttributeBrowserControlStyle.xaml"/>
+    </ContentView.Resources>
+
+    <StackLayout>
+
+        <Grid ColumnDefinitions="6*,Auto,4*">
+
+            <StackLayout Grid.Column="0" Padding="5"  HorizontalOptions="Fill" VerticalOptions="Fill">
+                
+                <Grid Padding="5" ColumnDefinitions="*,Auto">
+
+                    <Label 
+                    Grid.Column="0"
+                    Text="{Binding LpisParcelCount, StringFormat='LPIS Ply Attributes ({0})'}"
+                    Style="{StaticResource QaAttributeBrowserLabelStyle}" />    
+                    
+                    <Label 
+                    Grid.Column="1"
+                    Text="{Binding TotalDeductionSummary}" IsVisible="{Binding IsSummaryVisible}"
+                    Style="{StaticResource QaAttributeBrowserTotalDeductionLabelStyle}" />
+
+                </Grid>
+
+                <BoxView Style="{StaticResource QaAttributeBrowserLabelBoxViewtyle}"/>
+             
+                <ScrollView Orientation="Both"  Style="{StaticResource QaAttributeBrowserScrollViewStyle}">
+
+                    <CollectionView Style="{StaticResource QaAttributeBrowserCollectionViewStyle}">
+
+                        <CollectionView.Header>
+                            <Grid Style="{StaticResource QaAttributeBrowserCollectionViewHeaderGridStyle}">
+                                <Label Text="LPISPOLYID" Grid.Column="0" Style="{StaticResource QaAttributeBrowserCollectionViewHeaderLabelStyle}"/>
+                                <Label Text="OSSHEET" Grid.Column="1" Style="{StaticResource QaAttributeBrowserCollectionViewHeaderLabelStyle}"/>
+                                <Label Text="NGFIELD" Grid.Column="2" Style="{StaticResource QaAttributeBrowserCollectionViewHeaderLabelStyle}"/>
+                                <Label Text="IACSAREA" Grid.Column="3" Style="{StaticResource QaAttributeBrowserCollectionViewHeaderLabelStyle}"/>
+                                <Label Text="MAXUAREA" Grid.Column="4" Style="{StaticResource QaAttributeBrowserCollectionViewHeaderLabelStyle}"/>
+                                <Label Text="CONTROL METHOD" Grid.Column="5" Style="{StaticResource QaAttributeBrowserCollectionViewHeaderLabelStyle}"/>
+                                <Label Text="PARCELSTATUS" Grid.Column="6" Style="{StaticResource QaAttributeBrowserCollectionViewHeaderLabelStyle}"/>
+                                <Label Text="PARCELCHANGE" Grid.Column="7" Style="{StaticResource QaAttributeBrowserCollectionViewHeaderLabelStyle}"/>
+                                <Label Text="LATESTMOD" Grid.Column="8" Style="{StaticResource QaAttributeBrowserCollectionViewHeaderLabelStyle}"/>
+                                <Label Text="USERNAME" Grid.Column="9" Style="{StaticResource QaAttributeBrowserCollectionViewHeaderLabelStyle}"/>
+
+                            </Grid>
+                        </CollectionView.Header>
+
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="model:LpisParcelModel">
+                                <Grid Style="{StaticResource QaAttributeBrowserCollectionViewDataGridStyle}">
+                                    <Grid.Triggers>
+                                        <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="1">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Grid" Binding="{Binding Index, Converter={StaticResource AlternativeRowConverter}}" Value="0">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}" />
+                                        </DataTrigger>
+
+                                        <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SubformBackgroundLight}, Dark={StaticResource SubformBackgroundDark}}"/>
+                                        </DataTrigger>
+                                    </Grid.Triggers>
+                                    <Label Text="{Binding PolygonId}" Grid.Column="0" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                    <Label Text="{Binding OsSheet}" Grid.Column="1" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                    <Label Text="{Binding NgField}" Grid.Column="2" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                    <Label Text="{Binding IacsArea}" Grid.Column="3" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                    <Label Text="{Binding MaxUArea}" Grid.Column="4" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                    <Label Text="{Binding ControlMethod}" Grid.Column="5" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                    <Label Text="{Binding ParcelStatus}" Grid.Column="6" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                    <Label Text="{Binding ParcelChange}" Grid.Column="7" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                    <Label Text="{Binding LatestMod}" Grid.Column="8" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                    <Label Text="{Binding Username}" Grid.Column="9" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </ScrollView>
+            </StackLayout>
+
+            <BoxView Grid.Column="1" WidthRequest="1" BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}"/>
+        
+            <StackLayout Grid.Column="2" Padding="5"  HorizontalOptions="Fill" VerticalOptions="Fill">
+
+                <Border Grid.Row="0" Stroke="{StaticResource FieldBorderBrush}" StrokeThickness="1" Padding="5">
+                  
+                    <Grid Padding="5" ColumnDefinitions="*,Auto">
+        
+                        <StackLayout Spacing="5"  Grid.Column="0">
+                            <VerticalStackLayout Grid.Row="0" Grid.Column="2" >
+                                <Picker Style="{StaticResource QaAttributeLayerPickerStyle}" Margin="0">
+                                    <Picker.Behaviors>
+                                        <toolkit:EventToCommandBehavior 
+                                          EventName="SelectedIndexChanged"
+                                          Command="{Binding LpisRelatedLayerSelectionChangedCommand}"
+                                          CommandParameter="{Binding SelectedLayer}" />
+                                    </Picker.Behaviors>
+                                </Picker>
+                            </VerticalStackLayout>
+                        </StackLayout>
+                        <Label Grid.Column="1"
+                        Padding="5" Margin="0"
+                        Text="{Binding DisplayLpisRelatedFeatureCount}"
+                        Style="{StaticResource QaAttributeBrowserSelectedLayerLabelStyle}" />
+
+                    </Grid>
+
+                </Border>
+
+                <VerticalStackLayout>
+
+                    <ScrollView  Orientation="Both"  Style="{StaticResource QaAttributeBrowserLayrInfoScrollViewStyle}">
+
+                        <VerticalStackLayout>
+                            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Columns}" Spacing="0">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate>
+                                        <Label Text="{Binding}"
+                                           WidthRequest="120"
+                                           FontAttributes="Bold"
+                                           Padding="5"
+                                           HorizontalTextAlignment="Start" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </HorizontalStackLayout>
+                           
+                            <CollectionView ItemsSource="{Binding Rows}"
+                                SelectionMode="Single"
+                                SelectedItem="{Binding SelectedRow}">
+
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="model:LpisRelatedLayer">
+                                        <Grid ColumnSpacing="0">
+   
+                                            <Grid.Triggers>
+                                                <DataTrigger TargetType="Grid" Binding="{Binding Index}" Value="0">
+                                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}"/>
+                                                </DataTrigger>
+                                                <DataTrigger TargetType="Grid" Binding="{Binding Index}" Value="1">
+                                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}"/>
+                                                </DataTrigger>
+                                                <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SubformBackgroundLight}, Dark={StaticResource SubformBackgroundDark}}"/>
+                                                </DataTrigger>
+                                            </Grid.Triggers>
+
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Values}" Spacing="0">
+
+                                                <BindableLayout.ItemTemplate>
+                                                    <DataTemplate x:DataType="model:CellItem">
+                                                    <Label
+                                                    Text="{Binding ColumnValue}"
+                                                    WidthRequest="120"
+                                                    Padding="5"
+                                                    HorizontalTextAlignment="Start" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"/>   
+                                                    </DataTemplate>
+                                                </BindableLayout.ItemTemplate>
+
+                                            </HorizontalStackLayout>
+
+                                        </Grid>
+
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </ScrollView>
+                </VerticalStackLayout>
+            </StackLayout>
+        </Grid>
+        <ActivityIndicator
+      IsRunning="{Binding IsLoading}"
+      IsVisible="{Binding IsLoading}"
+      HorizontalOptions="Center"
+      VerticalOptions="Center" Margin="0,-100,0,0" />
+    </StackLayout>
+</ContentView>
