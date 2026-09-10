@@ -1,26 +1,51 @@
-# Description and acceptance: Attribute Error browser theming
+# Description and acceptance: Topological Checks browser theming
 
 ## Description
-Themes the Attribute Error browser chrome (the health-checks list, the details grid,
-the dividers and the by-passable status border). Backgrounds, dividers, row stripes,
-selection and all label text now follow the app theme via AppThemeBinding, so the
-browser is readable in dark theme. The status border on the details heading turns the
-Error role when a check is not by-passable and Border strong otherwise.
+Themes the Topological Checks browser so it is readable in dark mode. The total-error
+count label at the top, the thin divider line under it, the column headers, the data
+rows (the nine columns of error values), the alternating row stripes and the
+selected-row highlight now all change colour with the app theme. Previously the data
+values were fixed black, so they were invisible in dark mode; they are now light in
+dark mode.
 
 ## Acceptance criteria
-1. In dark theme the browser panel and its grid/list backgrounds are dark (Surface), not white.
-2. In dark theme every header and data-row value is readable (light text on the dark surface); nothing is black-on-dark or invisible.
-3. Alternating row stripes are visible and subtle in both themes (odd = Surface variant, even = Surface).
-4. The selected row highlight is visible and distinct in both themes (Subform background).
-5. The divider line(s) between panes are visible in both themes.
-6. In light theme the browser looks as it did before this change.
-7. Switching Light / Dark / Auto at runtime updates the whole browser with no restart, including the virtualised data-row text (which is themed inline per label for this reason).
-8. No behaviour change: selection, tap-to-zoom, commands, and any pickers/date pickers behave as before.
-9. The map surface is unchanged in both themes.
-10. When a health check is not by-passable the details heading border reads as the
-    error red in both themes; when it is by-passable the border is a neutral strong
-    border.
-11. In dark theme, a by-passable health-check value reads as light On surface text (not
-    black); a not-by-passable value reads as the themed Error red. Both follow a live
-    theme switch (normal text is inline-themed; error via a DataTrigger). The
-    BooleanToColorConverter has been retired and its class deleted.
+Check each item once in Light mode and once in Dark mode (Settings > theme).
+
+1. The "Total No. of Topological Error(s): N" label at the top:
+   - Light mode: dark, almost black text (#222222).
+   - Dark mode: near-white, light grey text (#ececec). Readable, not black-on-dark.
+
+2. The column headers (Index, OriginFeatureId, DestinationFeatureId, ErrorType, etc.):
+   - Light mode: dark, almost black text (#222222).
+   - Dark mode: near-white, light grey text (#ececec).
+
+3. The data values in every row and column:
+   - Light mode: dark, almost black text (#222222).
+   - Dark mode: near-white, light grey text (#ececec). This is the main fix: the values
+     used to stay black and were invisible in dark mode.
+
+4. The thin divider line under the count label:
+   - Light mode: light grey (#d2d2d2).
+   - Dark mode: medium grey (#4a4a4a). Visible in both modes.
+
+5. Alternating row stripes:
+   - Light mode: rows alternate white (#ffffff) and very light grey (#f4f4f4).
+   - Dark mode: rows alternate very dark grey, almost black (#1f1f1f) and a slightly
+     lighter dark grey (#292929). The stripes should be subtle but visible.
+
+6. Selected row highlight:
+   - Light mode: pale blue (#eef4fb).
+   - Dark mode: dark navy blue (#15212c). The selected row stands out from the stripes
+     in both modes.
+
+7. In Light mode the whole browser looks the same as before this change (white/very
+   light grey rows, dark text).
+
+8. Switching theme while the browser is open updates everything at once with no
+   restart, including the count label, headers, data values, stripes and selection.
+   Nothing is left the old colour.
+
+9. No behaviour change: selecting a row and tapping to zoom to the error work exactly
+   as before.
+
+10. The map behind/around the browser looks identical in Light and Dark mode.
