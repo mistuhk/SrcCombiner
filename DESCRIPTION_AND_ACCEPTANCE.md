@@ -1,26 +1,52 @@
-# Description and acceptance: Attribute Error browser theming
+# Description and acceptance: Sliver Area browser theming
 
 ## Description
-Themes the Attribute Error browser chrome (the health-checks list, the details grid,
-the dividers and the by-passable status border). Backgrounds, dividers, row stripes,
-selection and all label text now follow the app theme via AppThemeBinding, so the
-browser is readable in dark theme. The status border on the details heading turns the
-Error role when a check is not by-passable and Border strong otherwise.
+Themes the Sliver Area browser so it is readable in dark mode. The top divider line,
+the vertical divider between the results grid and the layer picker, the four-column
+results grid (headers and data rows), the alternating row stripes, the selected-row
+highlight, the "Select layer to search sliver areas" label and the layer picker all
+change colour with the app theme.
 
 ## Acceptance criteria
-1. In dark theme the browser panel and its grid/list backgrounds are dark (Surface), not white.
-2. In dark theme every header and data-row value is readable (light text on the dark surface); nothing is black-on-dark or invisible.
-3. Alternating row stripes are visible and subtle in both themes (odd = Surface variant, even = Surface).
-4. The selected row highlight is visible and distinct in both themes (Subform background).
-5. The divider line(s) between panes are visible in both themes.
-6. In light theme the browser looks as it did before this change.
-7. Switching Light / Dark / Auto at runtime updates the whole browser with no restart, including the virtualised data-row text (which is themed inline per label for this reason).
-8. No behaviour change: selection, tap-to-zoom, commands, and any pickers/date pickers behave as before.
-9. The map surface is unchanged in both themes.
-10. When a health check is not by-passable the details heading border reads as the
-    error red in both themes; when it is by-passable the border is a neutral strong
-    border.
-11. In dark theme, a by-passable health-check value reads as light On surface text (not
-    black); a not-by-passable value reads as the themed Error red. Both follow a live
-    theme switch (normal text is inline-themed; error via a DataTrigger). The
-    BooleanToColorConverter has been retired and its class deleted.
+Check each item once in Light mode and once in Dark mode (Settings > theme).
+
+1. Column headers (OBJECTID, POLYGONID, SHAPE AREA, and the area column) and the data
+   values in every row:
+   - Light mode: dark, almost black text (#222222).
+   - Dark mode: near-white, light grey text (#ececec). Readable, not black-on-dark or
+     invisible.
+
+2. Alternating row stripes:
+   - Light mode: rows alternate white (#ffffff) and very light grey (#f4f4f4).
+   - Dark mode: rows alternate very dark grey, almost black (#1f1f1f) and a slightly
+     lighter dark grey (#292929). Subtle but visible.
+
+3. Selected row highlight:
+   - Light mode: pale blue (#eef4fb).
+   - Dark mode: dark navy blue (#15212c). The selected row stands out from the stripes
+     in both modes.
+
+4. The two divider lines (the thin line across the top, and the vertical line between
+   the grid and the layer picker on the right):
+   - Light mode: light grey (#d2d2d2).
+   - Dark mode: medium grey (#4a4a4a). Visible in both modes.
+
+5. The "Select layer to search sliver areas" label:
+   - Light mode: dark, almost black text (#222222).
+   - Dark mode: near-white, light grey text (#ececec).
+
+6. The layer picker (dropdown) on the right:
+   - Light mode: white box with dark text.
+   - Dark mode: dark box with light text (both the closed box and the opened list).
+
+7. In Light mode the whole browser looks the same as before this change (white/very
+   light grey rows, dark text).
+
+8. Switching theme while the browser is open updates everything at once with no
+   restart, including the data-row text, stripes and selection. Nothing is left the old
+   colour.
+
+9. No behaviour change: selecting a layer, running the sliver search, and selecting a
+   result row all work exactly as before.
+
+10. The map behind/around the browser looks identical in Light and Dark mode.
