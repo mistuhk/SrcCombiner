@@ -1,0 +1,1111 @@
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryJournal.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryJournal.cs
+new file mode 100644
+index 0000000..eba092c
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryJournal.cs
+@@ -0,0 +1,248 @@
++using WG.MiEditor.Shared.AutoScanning;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Keeps the most recent operations available for undo and redo. Backed by linked lists
++/// rather than a stack because the oldest entry has to be evicted once the cap is reached,
++/// which a stack cannot do. Entries move between the two lists rather than being copied, and
++/// recording clears redo, so the combined depth never exceeds the cap.
++/// </summary>
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IEditHistoryJournal) })]
++public sealed class EditHistoryJournal : IEditHistoryJournal
++{
++    public const int DefaultMaxDepth = 10;
++
++    private readonly LinkedList<EditOperationEntry> undo = new();
++    private readonly LinkedList<EditOperationEntry> redo = new();
++    private readonly int maxDepth;
++    private readonly long maxEntrySizeInBytes;
++
++    public EditHistoryJournal()
++        : this(DefaultMaxDepth)
++    {
++    }
++
++    public EditHistoryJournal(int maxDepth, long maxEntrySizeInBytes = 8L * 1024 * 1024)
++    {
++        ArgumentOutOfRangeException.ThrowIfLessThan(maxDepth, 1);
++
++        this.maxDepth = maxDepth;
++        this.maxEntrySizeInBytes = maxEntrySizeInBytes;
++    }
++
++    public event EventHandler? Changed;
++
++    public bool CanUndo => undo.Last?.Value.IsUndoable == true;
++
++    public bool CanRedo => redo.Count > 0;
++
++    public int UndoDepth => undo.Count;
++
++    public int RedoDepth => redo.Count;
++
++    public void Record(EditOperationEntry entry)
++    {
++        ArgumentNullException.ThrowIfNull(entry);
++
++        var toRecord = entry.IsUndoable && entry.ApproximateSizeInBytes() > maxEntrySizeInBytes
++            ? entry.AsNotUndoable("The operation is too large to undo.")
++            : entry;
++
++        undo.AddLast(toRecord);
++
++        while (undo.Count > maxDepth)
++        {
++            undo.RemoveFirst();
++        }
++
++        redo.Clear();
++
++        RaiseChanged();
++    }
++
++    public EditOperationEntry? PeekUndo() => undo.Last?.Value;
++
++    public EditOperationEntry? PeekRedo() => redo.Last?.Value;
++
++    public EditOperationEntry? PopUndoToRedo()
++    {
++        var entry = RemoveLast(undo);
++        if (entry is null)
++        {
++            return null;
++        }
++
++        redo.AddLast(entry);
++        RaiseChanged();
++
++        return entry;
++    }
++
++    public EditOperationEntry? PopRedoToUndo()
++    {
++        var entry = RemoveLast(redo);
++        if (entry is null)
++        {
++            return null;
++        }
++
++        undo.AddLast(entry);
++        RaiseChanged();
++
++        return entry;
++    }
++
++    public EditOperationEntry? DiscardUndo()
++    {
++        var entry = RemoveLast(undo);
++        if (entry is not null)
++        {
++            RaiseChanged();
++        }
++
++        return entry;
++    }
++
++    public void DiscardRedoFrom()
++    {
++        if (redo.Count == 0)
++        {
++            return;
++        }
++
++        redo.Clear();
++        RaiseChanged();
++    }
++
++    public void RemapObjectId(string layerName, long oldObjectId, long newObjectId)
++    {
++        if (oldObjectId == newObjectId)
++        {
++            return;
++        }
++
++        var remapped = Remap(undo, layerName, oldObjectId, newObjectId);
++        remapped |= Remap(redo, layerName, oldObjectId, newObjectId);
++
++        if (remapped)
++        {
++            RaiseChanged();
++        }
++    }
++
++    public int DropEntriesReferencing(IReadOnlyCollection<FeatureIdentity> identities)
++    {
++        if (identities.Count == 0)
++        {
++            return 0;
++        }
++
++        var dropped = Drop(undo, identities) + Drop(redo, identities);
++
++        if (dropped > 0)
++        {
++            RaiseChanged();
++        }
++
++        return dropped;
++    }
++
++    public void Clear()
++    {
++        if (undo.Count == 0 && redo.Count == 0)
++        {
++            return;
++        }
++
++        undo.Clear();
++        redo.Clear();
++
++        RaiseChanged();
++    }
++
++    private static EditOperationEntry? RemoveLast(LinkedList<EditOperationEntry> list)
++    {
++        var last = list.Last;
++        if (last is null)
++        {
++            return null;
++        }
++
++        list.RemoveLast();
++
++        return last.Value;
++    }
++
++    private static bool Remap(
++        LinkedList<EditOperationEntry> list,
++        string layerName,
++        long oldObjectId,
++        long newObjectId)
++    {
++        var changed = false;
++
++        for (var node = list.First; node is not null; node = node.Next)
++        {
++            var entry = node.Value;
++            var changes = new List<FeatureChange>(entry.Changes.Count);
++            var entryChanged = false;
++
++            foreach (var change in entry.Changes)
++            {
++                var before = RemapSnapshot(change.Before, layerName, oldObjectId, newObjectId);
++                var after = RemapSnapshot(change.After, layerName, oldObjectId, newObjectId);
++
++                entryChanged |= !ReferenceEquals(before, change.Before) || !ReferenceEquals(after, change.After);
++                changes.Add(change with { Before = before, After = after });
++            }
++
++            if (entryChanged)
++            {
++                node.Value = entry with { Changes = changes };
++                changed = true;
++            }
++        }
++
++        return changed;
++    }
++
++    private static FeatureSnapshot? RemapSnapshot(
++        FeatureSnapshot? snapshot,
++        string layerName,
++        long oldObjectId,
++        long newObjectId)
++    {
++        if (snapshot is null
++            || snapshot.Identity.ObjectId != oldObjectId
++            || !string.Equals(snapshot.Identity.LayerName, layerName, StringComparison.OrdinalIgnoreCase))
++        {
++            return snapshot;
++        }
++
++        return snapshot with { Identity = snapshot.Identity with { ObjectId = newObjectId } };
++    }
++
++    private static int Drop(LinkedList<EditOperationEntry> list, IReadOnlyCollection<FeatureIdentity> identities)
++    {
++        var dropped = 0;
++        var node = list.First;
++
++        while (node is not null)
++        {
++            var next = node.Next;
++
++            if (identities.Any(identity => node.Value.References(identity)))
++            {
++                list.Remove(node);
++                dropped++;
++            }
++
++            node = next;
++        }
++
++        return dropped;
++    }
++
++    private void RaiseChanged() => Changed?.Invoke(this, EventArgs.Empty);
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationEntry.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationEntry.cs
+new file mode 100644
+index 0000000..14607aa
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationEntry.cs
+@@ -0,0 +1,38 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// One user visible operation, however many rows or tables it touched. A single entry is a
++/// single press of undo. The case key is stamped at record time and re-checked before an
++/// undo, so history recorded against one case can never be applied against another.
++/// </summary>
++public sealed record EditOperationEntry(
++    Guid Id,
++    string OperationName,
++    string CaseKey,
++    DateTime RecordedAtUtc,
++    IReadOnlyList<FeatureChange> Changes,
++    bool IsUndoable = true,
++    string? NotUndoableReason = null)
++{
++    public static EditOperationEntry Create(
++        string operationName,
++        string caseKey,
++        IReadOnlyList<FeatureChange> changes,
++        DateTime recordedAtUtc) =>
++        new(Guid.NewGuid(), operationName, caseKey, recordedAtUtc, changes);
++
++    /// <summary>
++    /// The changes needed to reverse this operation: every delta inverted, applied in reverse
++    /// order so that child rows are removed before the parents they reference.
++    /// </summary>
++    public IReadOnlyList<FeatureChange> InverseChanges() =>
++        [.. Changes.Reverse().Select(change => change.Inverse())];
++
++    public EditOperationEntry AsNotUndoable(string reason) =>
++        this with { IsUndoable = false, NotUndoableReason = reason };
++
++    public long ApproximateSizeInBytes() => Changes.Sum(change => change.ApproximateSizeInBytes());
++
++    public bool References(FeatureIdentity identity) =>
++        Changes.Any(change => change.Identity.SameRowAs(identity));
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChange.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChange.cs
+new file mode 100644
+index 0000000..d05e71b
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChange.cs
+@@ -0,0 +1,43 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// One primitive row delta. Every committed operation is recorded as an ordered list of
++/// these, which is what lets a single generic applier reverse merge, split, delete and the
++/// multi table creates without an inverse handler per operation family.
++/// </summary>
++public sealed record FeatureChange(
++    FeatureChangeKind Kind,
++    FeatureSnapshot? Before,
++    FeatureSnapshot? After)
++{
++    public static FeatureChange Insert(FeatureSnapshot after) => new(FeatureChangeKind.Insert, null, after);
++
++    public static FeatureChange Update(FeatureSnapshot before, FeatureSnapshot after) =>
++        new(FeatureChangeKind.Update, before, after);
++
++    public static FeatureChange Delete(FeatureSnapshot before) => new(FeatureChangeKind.Delete, before, null);
++
++    /// <summary>
++    /// The snapshot describing the row as it should exist after this change was applied, or
++    /// the pre-edit snapshot for a delete, which is the only thing left to identify it by.
++    /// </summary>
++    public FeatureSnapshot Reference => After ?? Before
++        ?? throw new InvalidOperationException("A feature change must carry a before or an after snapshot.");
++
++    public FeatureIdentity Identity => Reference.Identity;
++
++    /// <summary>
++    /// The compensating change. An insert is undone by deleting, a delete by inserting the
++    /// captured row, and an update by writing the previous state back.
++    /// </summary>
++    public FeatureChange Inverse() => Kind switch
++    {
++        FeatureChangeKind.Insert => new FeatureChange(FeatureChangeKind.Delete, After, null),
++        FeatureChangeKind.Delete => new FeatureChange(FeatureChangeKind.Insert, null, Before),
++        FeatureChangeKind.Update => new FeatureChange(FeatureChangeKind.Update, After, Before),
++        _ => throw new InvalidOperationException($"Unsupported change kind: {Kind}.")
++    };
++
++    public long ApproximateSizeInBytes() =>
++        (Before?.ApproximateSizeInBytes() ?? 0) + (After?.ApproximateSizeInBytes() ?? 0);
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChangeKind.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChangeKind.cs
+new file mode 100644
+index 0000000..2149981
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChangeKind.cs
+@@ -0,0 +1,8 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++public enum FeatureChangeKind
++{
++    Insert,
++    Update,
++    Delete
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentity.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentity.cs
+new file mode 100644
+index 0000000..d3d877c
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentity.cs
+@@ -0,0 +1,36 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Identifies a single row for the edit history. The business key is preferred over the
++/// object id because a feature re-created by an inverse insert is assigned a new object
++/// id by the service, whereas the business key is carried across on the attribute copy.
++/// </summary>
++public sealed record FeatureIdentity(
++    string LayerName,
++    long ObjectId,
++    string? BusinessKeyField = null,
++    string? BusinessKeyValue = null)
++{
++    public bool HasBusinessKey =>
++        !string.IsNullOrWhiteSpace(BusinessKeyField) && !string.IsNullOrWhiteSpace(BusinessKeyValue);
++
++    /// <summary>
++    /// Two identities refer to the same row when their business keys match, falling back to
++    /// the object id when either side has no business key.
++    /// </summary>
++    public bool SameRowAs(FeatureIdentity other)
++    {
++        if (!string.Equals(LayerName, other.LayerName, StringComparison.OrdinalIgnoreCase))
++        {
++            return false;
++        }
++
++        if (HasBusinessKey && other.HasBusinessKey)
++        {
++            return string.Equals(BusinessKeyField, other.BusinessKeyField, StringComparison.OrdinalIgnoreCase)
++                && string.Equals(BusinessKeyValue, other.BusinessKeyValue, StringComparison.OrdinalIgnoreCase);
++        }
++
++        return ObjectId == other.ObjectId;
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentityPolicy.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentityPolicy.cs
+new file mode 100644
+index 0000000..841d89d
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentityPolicy.cs
+@@ -0,0 +1,28 @@
++using WG.MiEditor.Configuration.AppSettings;
++using WG.MiEditor.Shared.AutoScanning;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IFeatureIdentityPolicy) })]
++public sealed class FeatureIdentityPolicy(Layers layers) : IFeatureIdentityPolicy
++{
++    private const string PolygonId = "POLYGONID";
++    private const string LatestMod = "LATESTMOD";
++    private const string ModifiedDate = "MODIFIEDDT";
++
++    /// <summary>
++    /// Only the LPIS parcel layer has a single attribute that both identifies one row and
++    /// survives a delete and re-insert. The child layers carry POLYGONID or LPISPOLYID, but
++    /// those reference the parent parcel and repeat across many rows, so they cannot identify
++    /// a row on their own. Those layers return null and rely on object id remapping instead.
++    /// </summary>
++    public string? BusinessKeyField(string layerName) =>
++        Matches(layerName, layers.LPIS_Poly) ? PolygonId : null;
++
++    public string StampField(string layerName) =>
++        Matches(layerName, layers.LPIS_Poly) ? LatestMod : ModifiedDate;
++
++    private static bool Matches(string layerName, string? configured) =>
++        !string.IsNullOrWhiteSpace(configured)
++        && string.Equals(layerName, configured, StringComparison.OrdinalIgnoreCase);
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshot.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshot.cs
+new file mode 100644
+index 0000000..62060b5
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshot.cs
+@@ -0,0 +1,30 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// The state of one row at one moment. Geometry is held as Esri JSON so the snapshot stays
++/// free of runtime types and cannot be mutated by later edits to the live feature.
++/// </summary>
++public sealed record FeatureSnapshot(
++    FeatureIdentity Identity,
++    string? GeometryJson,
++    string? StampField,
++    DateTime? StampValue,
++    IReadOnlyDictionary<string, object?> Attributes)
++{
++    /// <summary>
++    /// Approximate memory cost, used by the journal size guard. Attribute values are counted
++    /// by their string length, which is close enough to rank an entry against a byte budget.
++    /// </summary>
++    public long ApproximateSizeInBytes()
++    {
++        long total = (GeometryJson?.Length ?? 0) * 2L;
++
++        foreach (var pair in Attributes)
++        {
++            total += pair.Key.Length * 2L;
++            total += (pair.Value?.ToString()?.Length ?? 0) * 2L;
++        }
++
++        return total;
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryJournal.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryJournal.cs
+new file mode 100644
+index 0000000..06800f4
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryJournal.cs
+@@ -0,0 +1,44 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// The bounded undo and redo stacks. Holds no Esri types and performs no input or output, so
++/// the ordering, eviction and invalidation rules are unit testable on their own.
++/// </summary>
++public interface IEditHistoryJournal
++{
++    bool CanUndo { get; }
++    bool CanRedo { get; }
++    int UndoDepth { get; }
++    int RedoDepth { get; }
++
++    /// <summary>Records a new operation, evicting the oldest past the cap and clearing redo.</summary>
++    void Record(EditOperationEntry entry);
++
++    EditOperationEntry? PeekUndo();
++    EditOperationEntry? PeekRedo();
++
++    /// <summary>Moves the most recent entry from the undo stack to the redo stack.</summary>
++    EditOperationEntry? PopUndoToRedo();
++
++    /// <summary>Moves the most recent entry from the redo stack back to the undo stack.</summary>
++    EditOperationEntry? PopRedoToUndo();
++
++    /// <summary>Discards the most recent undo entry without offering it for redo.</summary>
++    EditOperationEntry? DiscardUndo();
++
++    /// <summary>Discards the most recent redo entry and everything behind it.</summary>
++    void DiscardRedoFrom();
++
++    /// <summary>
++    /// Rewrites a stale object id across both stacks after an inverse insert was assigned a
++    /// new one by the service.
++    /// </summary>
++    void RemapObjectId(string layerName, long oldObjectId, long newObjectId);
++
++    /// <summary>Drops every entry in either stack that touches any of the given rows.</summary>
++    int DropEntriesReferencing(IReadOnlyCollection<FeatureIdentity> identities);
++
++    void Clear();
++
++    event EventHandler? Changed;
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureIdentityPolicy.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureIdentityPolicy.cs
+new file mode 100644
+index 0000000..225e007
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureIdentityPolicy.cs
+@@ -0,0 +1,15 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Resolves the per layer fields the history depends on. Both differ by layer: LPIS parcels
++/// carry a POLYGONID business key and stamp LATESTMOD, while the other editable layers have
++/// no business key of their own and stamp MODIFIEDDT.
++/// </summary>
++public interface IFeatureIdentityPolicy
++{
++    /// <summary>The attribute that survives a delete and re-insert, or null when there is none.</summary>
++    string? BusinessKeyField(string layerName);
++
++    /// <summary>The attribute written on every edit, used to detect a third party change.</summary>
++    string StampField(string layerName);
++}
+diff --git a/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs b/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs
+new file mode 100644
+index 0000000..911729c
+--- /dev/null
++++ b/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs
+@@ -0,0 +1,8 @@
++namespace WG.MiEditor.Configuration.AppSettings;
++
++/// <summary>
++/// Bounds the edit history. MaxUndoDepth is the number of operations kept, and
++/// MaxEntrySizeInBytes guards against a single very large operation, which is recorded but
++/// flagged as not undoable rather than held in memory.
++/// </summary>
++public record EditHistoryInfo(int MaxUndoDepth = 10, long MaxEntrySizeInBytes = 8L * 1024 * 1024);
+diff --git a/Src/MiEditor.Shared/Messages/Toolbar/EditHistoryMessages.cs b/Src/MiEditor.Shared/Messages/Toolbar/EditHistoryMessages.cs
+new file mode 100644
+index 0000000..d5428bb
+--- /dev/null
++++ b/Src/MiEditor.Shared/Messages/Toolbar/EditHistoryMessages.cs
+@@ -0,0 +1,7 @@
++namespace WG.MiEditor.Shared.Messages.Toolbar;
++
++/// <summary>
++/// Broadcast whenever the edit history changes, so the standard toolbar can enable or
++/// disable the undo and redo buttons. Mirrors how the map view navigation buttons are driven.
++/// </summary>
++public sealed record EditHistoryChangedMessage(bool CanUndo, bool CanRedo);
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryJournalTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryJournalTests.cs
+new file mode 100644
+index 0000000..e4f80c6
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryJournalTests.cs
+@@ -0,0 +1,247 @@
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using static WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.EditHistoryTestData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++public class EditHistoryJournalTests
++{
++    private readonly EditHistoryJournal sut = new(maxDepth: 10);
++
++    [Fact]
++    public void NewJournal_OffersNeitherUndoNorRedo()
++    {
++        Assert.False(sut.CanUndo);
++        Assert.False(sut.CanRedo);
++        Assert.Equal(0, sut.UndoDepth);
++    }
++
++    [Fact]
++    public void Record_MakesTheOperationUndoable()
++    {
++        sut.Record(Entry());
++
++        Assert.True(sut.CanUndo);
++        Assert.Equal(1, sut.UndoDepth);
++    }
++
++    [Fact]
++    public void Record_PastTheCap_EvictsTheOldestOperation()
++    {
++        var oldest = Entry("Operation 0");
++        sut.Record(oldest);
++
++        for (var i = 1; i <= 10; i++)
++        {
++            sut.Record(Entry($"Operation {i}"));
++        }
++
++        Assert.Equal(10, sut.UndoDepth);
++
++        var names = DrainUndoNames();
++        Assert.DoesNotContain("Operation 0", names);
++        Assert.Contains("Operation 10", names);
++    }
++
++    [Fact]
++    public void Record_ClearsTheRedoStack()
++    {
++        sut.Record(Entry("first"));
++        sut.PopUndoToRedo();
++        Assert.True(sut.CanRedo);
++
++        sut.Record(Entry("second"));
++
++        Assert.False(sut.CanRedo);
++        Assert.Equal(0, sut.RedoDepth);
++    }
++
++    [Theory]
++    [InlineData(1)]
++    [InlineData(5)]
++    [InlineData(10)]
++    public void CombinedDepth_NeverExceedsTheCap(int operations)
++    {
++        for (var i = 0; i < operations; i++)
++        {
++            sut.Record(Entry($"Operation {i}"));
++        }
++
++        for (var i = 0; i < operations; i++)
++        {
++            sut.PopUndoToRedo();
++            Assert.True(sut.UndoDepth + sut.RedoDepth <= 10);
++        }
++
++        Assert.Equal(operations, sut.RedoDepth);
++        Assert.Equal(0, sut.UndoDepth);
++    }
++
++    [Fact]
++    public void PopUndoToRedo_ThenPopRedoToUndo_RestoresTheSameEntry()
++    {
++        var entry = Entry("Merge");
++        sut.Record(entry);
++
++        var undone = sut.PopUndoToRedo();
++        var redone = sut.PopRedoToUndo();
++
++        Assert.Equal(entry.Id, undone!.Id);
++        Assert.Equal(entry.Id, redone!.Id);
++        Assert.Equal(1, sut.UndoDepth);
++        Assert.Equal(0, sut.RedoDepth);
++    }
++
++    [Fact]
++    public void PopUndoToRedo_OnAnEmptyJournal_ReturnsNull()
++    {
++        Assert.Null(sut.PopUndoToRedo());
++        Assert.Null(sut.PopRedoToUndo());
++    }
++
++    [Fact]
++    public void DiscardUndo_RemovesTheEntryWithoutOfferingItForRedo()
++    {
++        sut.Record(Entry());
++
++        sut.DiscardUndo();
++
++        Assert.False(sut.CanUndo);
++        Assert.False(sut.CanRedo);
++    }
++
++    [Fact]
++    public void RemapObjectId_RewritesTheIdAcrossBothStacks()
++    {
++        sut.Record(EntryTouching(42));
++        sut.PopUndoToRedo();
++        sut.Record(EntryTouching(42));
++
++        sut.RemapObjectId(Layer, oldObjectId: 42, newObjectId: 77);
++
++        Assert.Equal(77, sut.PeekUndo()!.Changes[0].Identity.ObjectId);
++    }
++
++    [Fact]
++    public void RemapObjectId_LeavesOtherLayersAlone()
++    {
++        sut.Record(Entry(changes: [FeatureChange.Update(
++            Snapshot(42, layer: "Canopy_Point"),
++            Snapshot(42, layer: "Canopy_Point"))]));
++
++        sut.RemapObjectId(Layer, oldObjectId: 42, newObjectId: 77);
++
++        Assert.Equal(42, sut.PeekUndo()!.Changes[0].Identity.ObjectId);
++    }
++
++    [Fact]
++    public void DropEntriesReferencing_SweepsBothStacks()
++    {
++        sut.Record(EntryTouching(1, "100"));
++        sut.Record(EntryTouching(2, "200"));
++        sut.PopUndoToRedo();
++
++        var dropped = sut.DropEntriesReferencing([Identity(2, "200")]);
++
++        Assert.Equal(1, dropped);
++        Assert.Equal(0, sut.RedoDepth);
++        Assert.Equal(1, sut.UndoDepth);
++    }
++
++    [Fact]
++    public void DropEntriesReferencing_MatchesOnBusinessKeyNotObjectId()
++    {
++        sut.Record(EntryTouching(1, "100"));
++
++        var dropped = sut.DropEntriesReferencing([Identity(999, "100")]);
++
++        Assert.Equal(1, dropped);
++        Assert.Equal(0, sut.UndoDepth);
++    }
++
++    [Fact]
++    public void Clear_EmptiesBothStacks()
++    {
++        sut.Record(Entry());
++        sut.PopUndoToRedo();
++        sut.Record(Entry());
++
++        sut.Clear();
++
++        Assert.False(sut.CanUndo);
++        Assert.False(sut.CanRedo);
++    }
++
++    [Fact]
++    public void OversizedOperation_IsRecordedButFlaggedNotUndoable()
++    {
++        var journal = new EditHistoryJournal(maxDepth: 10, maxEntrySizeInBytes: 8);
++
++        journal.Record(Entry(changes: [FeatureChange.Insert(Snapshot(1, "100", geometryJson: new string('x', 5000)))]));
++
++        Assert.Equal(1, journal.UndoDepth);
++        Assert.False(journal.CanUndo);
++        Assert.False(journal.PeekUndo()!.IsUndoable);
++        Assert.NotNull(journal.PeekUndo()!.NotUndoableReason);
++    }
++
++    [Fact]
++    public void Changed_IsRaisedOnEveryMutation()
++    {
++        var raised = 0;
++        sut.Changed += (_, _) => raised++;
++
++        sut.Record(Entry());
++        sut.PopUndoToRedo();
++        sut.PopRedoToUndo();
++        sut.Clear();
++
++        Assert.Equal(4, raised);
++    }
++
++    [Fact]
++    public void Changed_IsNotRaisedWhenNothingActuallyChanges()
++    {
++        var raised = 0;
++        sut.Changed += (_, _) => raised++;
++
++        sut.Clear();
++        sut.DiscardRedoFrom();
++        sut.DropEntriesReferencing([]);
++
++        Assert.Equal(0, raised);
++    }
++
++    [Fact]
++    public void Constructor_RejectsANonPositiveDepth()
++    {
++        Assert.Throws<ArgumentOutOfRangeException>(() => new EditHistoryJournal(maxDepth: 0));
++    }
++
++    [Fact]
++    public void RowsOnAKeylessLayer_AreNotTreatedAsTheSameRow()
++    {
++        // Two canopy points in the same parcel. Without a business key they must be
++        // distinguished by object id, or dropping one would drop both.
++        sut.Record(Entry(changes: [FeatureChange.Update(
++            Snapshot(501, layer: "Canopy_Point"), Snapshot(501, layer: "Canopy_Point"))]));
++        sut.Record(Entry(changes: [FeatureChange.Update(
++            Snapshot(502, layer: "Canopy_Point"), Snapshot(502, layer: "Canopy_Point"))]));
++
++        var dropped = sut.DropEntriesReferencing([new FeatureIdentity("Canopy_Point", 502)]);
++
++        Assert.Equal(1, dropped);
++        Assert.Equal(1, sut.UndoDepth);
++    }
++
++    private List<string> DrainUndoNames()
++    {
++        var names = new List<string>();
++
++        while (sut.PeekUndo() is not null)
++        {
++            names.Add(sut.DiscardUndo()!.OperationName);
++        }
++
++        return names;
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryTestData.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryTestData.cs
+new file mode 100644
+index 0000000..20a498a
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryTestData.cs
+@@ -0,0 +1,43 @@
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Builders for the history records. Kept deliberately small so each test reads as the rule
++/// it is asserting rather than as snapshot construction.
++/// </summary>
++internal static class EditHistoryTestData
++{
++    public const string Layer = "LPIS_Poly";
++    public const string CaseKey = "CASE-1";
++
++    public static FeatureIdentity Identity(long objectId, string? businessKey = null, string layer = Layer) =>
++        new(layer, objectId, businessKey is null ? null : "POLYGONID", businessKey);
++
++    public static FeatureSnapshot Snapshot(
++        long objectId,
++        string? businessKey = null,
++        string? geometryJson = "{\"rings\":[]}",
++        DateTime? stamp = null,
++        string layer = Layer,
++        IReadOnlyDictionary<string, object?>? attributes = null) =>
++        new(
++            Identity(objectId, businessKey, layer),
++            geometryJson,
++            "LATESTMOD",
++            stamp,
++            attributes ?? new Dictionary<string, object?> { ["POLYGONID"] = businessKey });
++
++    public static EditOperationEntry Entry(
++        string name = "Edit Vertex",
++        IReadOnlyList<FeatureChange>? changes = null,
++        string caseKey = CaseKey) =>
++        EditOperationEntry.Create(
++            name,
++            caseKey,
++            changes ?? [FeatureChange.Update(Snapshot(1, "100"), Snapshot(1, "100"))],
++            DateTime.UtcNow);
++
++    public static EditOperationEntry EntryTouching(long objectId, string? businessKey = null) =>
++        Entry(changes: [FeatureChange.Update(Snapshot(objectId, businessKey), Snapshot(objectId, businessKey))]);
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureChangeTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureChangeTests.cs
+new file mode 100644
+index 0000000..de9ef00
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureChangeTests.cs
+@@ -0,0 +1,78 @@
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using static WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.EditHistoryTestData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++public class FeatureChangeTests
++{
++    [Fact]
++    public void Insert_InvertsToDeleteOfTheInsertedRow()
++    {
++        var after = Snapshot(5, "500");
++
++        var inverse = FeatureChange.Insert(after).Inverse();
++
++        Assert.Equal(FeatureChangeKind.Delete, inverse.Kind);
++        Assert.Same(after, inverse.Before);
++        Assert.Null(inverse.After);
++    }
++
++    [Fact]
++    public void Delete_InvertsToInsertOfTheCapturedRow()
++    {
++        var before = Snapshot(5, "500");
++
++        var inverse = FeatureChange.Delete(before).Inverse();
++
++        Assert.Equal(FeatureChangeKind.Insert, inverse.Kind);
++        Assert.Same(before, inverse.After);
++        Assert.Null(inverse.Before);
++    }
++
++    [Fact]
++    public void Update_InvertsToUpdateBackToThePreviousState()
++    {
++        var before = Snapshot(5, "500", geometryJson: "before");
++        var after = Snapshot(5, "500", geometryJson: "after");
++
++        var inverse = FeatureChange.Update(before, after).Inverse();
++
++        Assert.Equal(FeatureChangeKind.Update, inverse.Kind);
++        Assert.Same(after, inverse.Before);
++        Assert.Same(before, inverse.After);
++    }
++
++    [Fact]
++    public void Inverse_AppliedTwice_ReturnsTheOriginalChange()
++    {
++        var original = FeatureChange.Update(Snapshot(1, "100", geometryJson: "a"), Snapshot(1, "100", geometryJson: "b"));
++
++        var roundTripped = original.Inverse().Inverse();
++
++        Assert.Equal(original, roundTripped);
++    }
++
++    [Fact]
++    public void InverseChanges_AreAppliedInReverseOrderSoChildrenGoBeforeParents()
++    {
++        var parent = FeatureChange.Insert(Snapshot(1, "100"));
++        var childA = FeatureChange.Insert(Snapshot(2, "100", layer: "LPIS_CRNs"));
++        var childB = FeatureChange.Insert(Snapshot(3, "100", layer: "LPIS_CRNs"));
++
++        var inverse = Entry(changes: [parent, childA, childB]).InverseChanges();
++
++        Assert.Equal(3, inverse.Count);
++        Assert.Equal(3, inverse[0].Identity.ObjectId);
++        Assert.Equal(2, inverse[1].Identity.ObjectId);
++        Assert.Equal(1, inverse[2].Identity.ObjectId);
++        Assert.All(inverse, change => Assert.Equal(FeatureChangeKind.Delete, change.Kind));
++    }
++
++    [Fact]
++    public void Reference_FallsBackToTheBeforeSnapshotForADelete()
++    {
++        var before = Snapshot(9, "900");
++
++        Assert.Same(before, FeatureChange.Delete(before).Reference);
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityPolicyTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityPolicyTests.cs
+new file mode 100644
+index 0000000..254ad01
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityPolicyTests.cs
+@@ -0,0 +1,87 @@
++using WG.MiEditor.Configuration.AppSettings;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using WG.MiEditor.Tests.Common.MockData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++public class FeatureIdentityPolicyTests
++{
++    private readonly Layers layers = CreateLayers();
++    private readonly FeatureIdentityPolicy sut;
++
++    public FeatureIdentityPolicyTests() => sut = new FeatureIdentityPolicy(layers);
++
++    [Fact]
++    public void LpisParcel_UsesPolygonIdAsItsBusinessKey()
++    {
++        Assert.Equal("POLYGONID", sut.BusinessKeyField(layers.LPIS_Poly));
++    }
++
++    [Fact]
++    public void LpisParcel_StampsLatestModNotModifiedDate()
++    {
++        Assert.Equal("LATESTMOD", sut.StampField(layers.LPIS_Poly));
++    }
++
++    [Fact]
++    public void OtherLayers_StampModifiedDate()
++    {
++        Assert.Equal("MODIFIEDDT", sut.StampField(layers.Canopy_Point));
++    }
++
++    [Fact]
++    public void ChildTablesOfAParcel_HaveNoBusinessKey()
++    {
++        // POLYGONID on these layers references the parent parcel and repeats across many
++        // rows, so it identifies a parcel rather than a row.
++        Assert.Null(sut.BusinessKeyField(layers.LPIS_CRNs));
++        Assert.Null(sut.BusinessKeyField(layers.Found_Info));
++    }
++
++    [Fact]
++    public void DeductionAndCanopyLayers_HaveNoBusinessKey()
++    {
++        // LPISPOLYID is a parent reference assigned from the containing parcel, so many
++        // canopy points share one value. These layers rely on object id remapping.
++        Assert.Null(sut.BusinessKeyField(layers.Canopy_Point));
++        Assert.Null(sut.BusinessKeyField(layers.Permanent_Deduction));
++        Assert.Null(sut.BusinessKeyField(layers.Canopy_Poly));
++    }
++
++    [Fact]
++    public void UnknownLayer_HasNoBusinessKeyRatherThanAGuessedOne()
++    {
++        Assert.Null(sut.BusinessKeyField("Some_Unmapped_Layer"));
++    }
++
++    [Fact]
++    public void LayerMatching_IsCaseInsensitive()
++    {
++        Assert.Equal("POLYGONID", sut.BusinessKeyField(layers.LPIS_Poly.ToUpperInvariant()));
++    }
++
++    [Fact]
++    public void UnconfiguredLayerName_DoesNotMatchEverything()
++    {
++        var blank = AppSettingsMockData.CreateAppSettings().Layers;
++
++        Assert.Null(new FeatureIdentityPolicy(blank).BusinessKeyField(string.Empty));
++    }
++
++    private static Layers CreateLayers()
++    {
++        var layers = AppSettingsMockData.CreateAppSettings().Layers;
++
++        layers.LPIS_Poly = "LPIS_Poly";
++        layers.LPIS_CRNs = "LPIS_CRNs";
++        layers.Found_Info = "Found_Info";
++        layers.DeclaredInfo = "DeclaredInfo";
++        layers.Canopy_Point = "Canopy_Point";
++        layers.Canopy_Poly = "Canopy_Poly";
++        layers.Permanent_Deduction = "Permanent_Deduction";
++        layers.Tech_Perm_Ddn = "Tech_Perm_Ddn";
++        layers.Published_Habitat = "Published_Habitat";
++
++        return layers;
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityTests.cs
+new file mode 100644
+index 0000000..0be5464
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityTests.cs
+@@ -0,0 +1,55 @@
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++public class FeatureIdentityTests
++{
++    [Fact]
++    public void RowsWithTheSameBusinessKey_AreTheSameRowEvenAfterTheObjectIdChanges()
++    {
++        var deleted = new FeatureIdentity("LPIS_Poly", 42, "POLYGONID", "10432");
++        var restored = new FeatureIdentity("LPIS_Poly", 87, "POLYGONID", "10432");
++
++        Assert.True(deleted.SameRowAs(restored));
++    }
++
++    [Fact]
++    public void WithoutABusinessKey_RowsAreDistinguishedByObjectId()
++    {
++        var first = new FeatureIdentity("Canopy_Point", 501);
++        var second = new FeatureIdentity("Canopy_Point", 502);
++
++        Assert.False(first.SameRowAs(second));
++        Assert.True(first.SameRowAs(new FeatureIdentity("Canopy_Point", 501)));
++    }
++
++    [Fact]
++    public void RowsOnDifferentLayers_AreNeverTheSameRow()
++    {
++        var parcel = new FeatureIdentity("LPIS_Poly", 42, "POLYGONID", "10432");
++        var crn = new FeatureIdentity("LPIS_CRNs", 42, "POLYGONID", "10432");
++
++        Assert.False(parcel.SameRowAs(crn));
++    }
++
++    [Fact]
++    public void AForeignKeyWouldCollapseDistinctRows()
++    {
++        // This is why FeatureIdentityPolicy hands out a business key only for LPIS_Poly.
++        // If a parent reference such as LPISPOLYID were used as the key, these two separate
++        // canopy points would compare equal and one undo would clear both from the history.
++        var pointA = new FeatureIdentity("Canopy_Point", 501, "LPISPOLYID", "10432");
++        var pointB = new FeatureIdentity("Canopy_Point", 502, "LPISPOLYID", "10432");
++
++        Assert.True(pointA.SameRowAs(pointB));
++    }
++
++    [Fact]
++    public void MixedKeyPresence_FallsBackToObjectId()
++    {
++        var keyed = new FeatureIdentity("LPIS_Poly", 42, "POLYGONID", "10432");
++        var unkeyed = new FeatureIdentity("LPIS_Poly", 42);
++
++        Assert.True(keyed.SameRowAs(unkeyed));
++    }
++}
