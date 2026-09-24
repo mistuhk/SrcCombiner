@@ -1,0 +1,704 @@
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryJournal.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryJournal.cs
+index eba092c..98d1254 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryJournal.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryJournal.cs
+@@ -1,79 +1,134 @@
++using WG.MiEditor.Configuration.AppSettings;
+ using WG.MiEditor.Shared.AutoScanning;
+ 
+ namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
+ 
+ /// <summary>
+ /// Keeps the most recent operations available for undo and redo. Backed by linked lists
+-/// rather than a stack because the oldest entry has to be evicted once the cap is reached,
++/// rather than a stack because the oldest entry has to be evicted once a cap is reached,
+ /// which a stack cannot do. Entries move between the two lists rather than being copied, and
+ /// recording clears redo, so the combined depth never exceeds the cap.
++/// <para>
++/// Two caps apply: how many operations are kept, and how much they may hold in total. The
++/// oldest are evicted until both are satisfied, so memory stays bounded without any single
++/// operation being singled out and refused. Only an operation larger than the entire budget
++/// cannot be held, and Record reports that rather than recording something unusable.
++/// </para>
++/// <para>
++/// Recording happens on whichever thread finished the edit, while undo is driven from the
++/// UI, so every member takes a lock. Contention is not a concern at this size, and the cost
++/// of getting it wrong once the callers exist is far higher than the cost of the lock.
++/// </para>
+ /// </summary>
+ [RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IEditHistoryJournal) })]
+ public sealed class EditHistoryJournal : IEditHistoryJournal
+ {
+-    public const int DefaultMaxDepth = 10;
+-
+     private readonly LinkedList<EditOperationEntry> undo = new();
+     private readonly LinkedList<EditOperationEntry> redo = new();
++    private readonly object gate = new();
+     private readonly int maxDepth;
+-    private readonly long maxEntrySizeInBytes;
++    private readonly long maxTotalBytes;
+ 
++    /// <summary>
++    /// Used by the convention scanner until the settings are bound. EditHistoryInfo owns the
++    /// default values, so they are not repeated here.
++    /// </summary>
+     public EditHistoryJournal()
+-        : this(DefaultMaxDepth)
++        : this(new EditHistoryInfo())
+     {
+     }
+ 
+-    public EditHistoryJournal(int maxDepth, long maxEntrySizeInBytes = 8L * 1024 * 1024)
++    public EditHistoryJournal(EditHistoryInfo settings)
+     {
+-        ArgumentOutOfRangeException.ThrowIfLessThan(maxDepth, 1);
++        ArgumentNullException.ThrowIfNull(settings);
++        ArgumentOutOfRangeException.ThrowIfLessThan(settings.MaxUndoDepth, 1);
++        ArgumentOutOfRangeException.ThrowIfLessThan(settings.MaxTotalBytes, 1);
+ 
+-        this.maxDepth = maxDepth;
+-        this.maxEntrySizeInBytes = maxEntrySizeInBytes;
++        maxDepth = settings.MaxUndoDepth;
++        maxTotalBytes = settings.MaxTotalBytes;
+     }
+ 
+     public event EventHandler? Changed;
+ 
+-    public bool CanUndo => undo.Last?.Value.IsUndoable == true;
++    public bool CanUndo
++    {
++        get { lock (gate) { return undo.Count > 0; } }
++    }
+ 
+-    public bool CanRedo => redo.Count > 0;
++    public bool CanRedo
++    {
++        get { lock (gate) { return redo.Count > 0; } }
++    }
+ 
+-    public int UndoDepth => undo.Count;
++    public int UndoDepth
++    {
++        get { lock (gate) { return undo.Count; } }
++    }
+ 
+-    public int RedoDepth => redo.Count;
++    public int RedoDepth
++    {
++        get { lock (gate) { return redo.Count; } }
++    }
+ 
+-    public void Record(EditOperationEntry entry)
++    public bool Record(EditOperationEntry entry)
+     {
+         ArgumentNullException.ThrowIfNull(entry);
+ 
+-        var toRecord = entry.IsUndoable && entry.ApproximateSizeInBytes() > maxEntrySizeInBytes
+-            ? entry.AsNotUndoable("The operation is too large to undo.")
+-            : entry;
++        lock (gate)
++        {
++            // Nothing is gained by evicting the whole history to make room for one operation
++            // that still would not fit, so leave the history alone and let the caller say so.
++            if (entry.ApproximateSizeInBytes() > maxTotalBytes)
++            {
++                return false;
++            }
+ 
+-        undo.AddLast(toRecord);
++            redo.Clear();
++            undo.AddLast(entry);
+ 
+-        while (undo.Count > maxDepth)
+-        {
+-            undo.RemoveFirst();
+-        }
++            while (undo.Count > maxDepth)
++            {
++                undo.RemoveFirst();
++            }
+ 
+-        redo.Clear();
++            // The entry just added is known to fit on its own, so this always terminates with
++            // at least that one entry still in the list.
++            while (undo.Count > 1 && TotalSize() > maxTotalBytes)
++            {
++                undo.RemoveFirst();
++            }
++        }
+ 
+         RaiseChanged();
++
++        return true;
+     }
+ 
+-    public EditOperationEntry? PeekUndo() => undo.Last?.Value;
++    public EditOperationEntry? PeekUndo()
++    {
++        lock (gate) { return undo.Last?.Value; }
++    }
+ 
+-    public EditOperationEntry? PeekRedo() => redo.Last?.Value;
++    public EditOperationEntry? PeekRedo()
++    {
++        lock (gate) { return redo.Last?.Value; }
++    }
+ 
+     public EditOperationEntry? PopUndoToRedo()
+     {
+-        var entry = RemoveLast(undo);
+-        if (entry is null)
++        EditOperationEntry? entry;
++
++        lock (gate)
+         {
+-            return null;
++            entry = RemoveLast(undo);
++            if (entry is null)
++            {
++                return null;
++            }
++
++            redo.AddLast(entry);
+         }
+ 
+-        redo.AddLast(entry);
+         RaiseChanged();
+ 
+         return entry;
+@@ -81,13 +136,19 @@ public sealed class EditHistoryJournal : IEditHistoryJournal
+ 
+     public EditOperationEntry? PopRedoToUndo()
+     {
+-        var entry = RemoveLast(redo);
+-        if (entry is null)
++        EditOperationEntry? entry;
++
++        lock (gate)
+         {
+-            return null;
++            entry = RemoveLast(redo);
++            if (entry is null)
++            {
++                return null;
++            }
++
++            undo.AddLast(entry);
+         }
+ 
+-        undo.AddLast(entry);
+         RaiseChanged();
+ 
+         return entry;
+@@ -95,7 +156,13 @@ public sealed class EditHistoryJournal : IEditHistoryJournal
+ 
+     public EditOperationEntry? DiscardUndo()
+     {
+-        var entry = RemoveLast(undo);
++        EditOperationEntry? entry;
++
++        lock (gate)
++        {
++            entry = RemoveLast(undo);
++        }
++
+         if (entry is not null)
+         {
+             RaiseChanged();
+@@ -104,14 +171,18 @@ public sealed class EditHistoryJournal : IEditHistoryJournal
+         return entry;
+     }
+ 
+-    public void DiscardRedoFrom()
++    public void ClearRedo()
+     {
+-        if (redo.Count == 0)
++        lock (gate)
+         {
+-            return;
++            if (redo.Count == 0)
++            {
++                return;
++            }
++
++            redo.Clear();
+         }
+ 
+-        redo.Clear();
+         RaiseChanged();
+     }
+ 
+@@ -122,8 +193,13 @@ public sealed class EditHistoryJournal : IEditHistoryJournal
+             return;
+         }
+ 
+-        var remapped = Remap(undo, layerName, oldObjectId, newObjectId);
+-        remapped |= Remap(redo, layerName, oldObjectId, newObjectId);
++        bool remapped;
++
++        lock (gate)
++        {
++            remapped = Remap(undo, layerName, oldObjectId, newObjectId);
++            remapped |= Remap(redo, layerName, oldObjectId, newObjectId);
++        }
+ 
+         if (remapped)
+         {
+@@ -133,12 +209,19 @@ public sealed class EditHistoryJournal : IEditHistoryJournal
+ 
+     public int DropEntriesReferencing(IReadOnlyCollection<FeatureIdentity> identities)
+     {
++        ArgumentNullException.ThrowIfNull(identities);
++
+         if (identities.Count == 0)
+         {
+             return 0;
+         }
+ 
+-        var dropped = Drop(undo, identities) + Drop(redo, identities);
++        int dropped;
++
++        lock (gate)
++        {
++            dropped = Drop(undo, identities) + Drop(redo, identities);
++        }
+ 
+         if (dropped > 0)
+         {
+@@ -150,17 +233,43 @@ public sealed class EditHistoryJournal : IEditHistoryJournal
+ 
+     public void Clear()
+     {
+-        if (undo.Count == 0 && redo.Count == 0)
++        lock (gate)
+         {
+-            return;
+-        }
++            if (undo.Count == 0 && redo.Count == 0)
++            {
++                return;
++            }
+ 
+-        undo.Clear();
+-        redo.Clear();
++            undo.Clear();
++            redo.Clear();
++        }
+ 
+         RaiseChanged();
+     }
+ 
++    /// <summary>
++    /// Recomputed rather than tracked incrementally. Entries are added and removed at six
++    /// points across two lists, and a running total would have to be kept correct at every
++    /// one of them. At ten entries the walk costs nothing, so the simpler code that is
++    /// obviously right is the better trade.
++    /// </summary>
++    private long TotalSize()
++    {
++        long total = 0;
++
++        foreach (var entry in undo)
++        {
++            total += entry.ApproximateSizeInBytes();
++        }
++
++        foreach (var entry in redo)
++        {
++            total += entry.ApproximateSizeInBytes();
++        }
++
++        return total;
++    }
++
+     private static EditOperationEntry? RemoveLast(LinkedList<EditOperationEntry> list)
+     {
+         var last = list.Last;
+@@ -193,8 +302,14 @@ public sealed class EditHistoryJournal : IEditHistoryJournal
+                 var before = RemapSnapshot(change.Before, layerName, oldObjectId, newObjectId);
+                 var after = RemapSnapshot(change.After, layerName, oldObjectId, newObjectId);
+ 
+-                entryChanged |= !ReferenceEquals(before, change.Before) || !ReferenceEquals(after, change.After);
+-                changes.Add(change with { Before = before, After = after });
++                if (ReferenceEquals(before, change.Before) && ReferenceEquals(after, change.After))
++                {
++                    changes.Add(change);
++                    continue;
++                }
++
++                entryChanged = true;
++                changes.Add(change.WithSnapshots(before, after));
+             }
+ 
+             if (entryChanged)
+@@ -244,5 +359,6 @@ public sealed class EditHistoryJournal : IEditHistoryJournal
+         return dropped;
+     }
+ 
++    // Raised outside the lock so a handler that calls back into the journal cannot deadlock.
+     private void RaiseChanged() => Changed?.Invoke(this, EventArgs.Empty);
+ }
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryJournal.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryJournal.cs
+index 06800f4..6629b54 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryJournal.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryJournal.cs
+@@ -3,6 +3,7 @@ namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
+ /// <summary>
+ /// The bounded undo and redo stacks. Holds no Esri types and performs no input or output, so
+ /// the ordering, eviction and invalidation rules are unit testable on their own.
++/// Every member is safe to call from any thread.
+ /// </summary>
+ public interface IEditHistoryJournal
+ {
+@@ -11,8 +12,13 @@ public interface IEditHistoryJournal
+     int UndoDepth { get; }
+     int RedoDepth { get; }
+ 
+-    /// <summary>Records a new operation, evicting the oldest past the cap and clearing redo.</summary>
+-    void Record(EditOperationEntry entry);
++    /// <summary>
++    /// Records a new operation, evicting the oldest entries past the depth or size budget and
++    /// clearing redo. Returns false, leaving the history untouched, when the operation on its
++    /// own is larger than the whole budget and so cannot be held at all. The caller is
++    /// expected to tell the user that this one operation cannot be undone.
++    /// </summary>
++    bool Record(EditOperationEntry entry);
+ 
+     EditOperationEntry? PeekUndo();
+     EditOperationEntry? PeekRedo();
+@@ -26,8 +32,8 @@ public interface IEditHistoryJournal
+     /// <summary>Discards the most recent undo entry without offering it for redo.</summary>
+     EditOperationEntry? DiscardUndo();
+ 
+-    /// <summary>Discards the most recent redo entry and everything behind it.</summary>
+-    void DiscardRedoFrom();
++    /// <summary>Discards every redo entry.</summary>
++    void ClearRedo();
+ 
+     /// <summary>
+     /// Rewrites a stale object id across both stacks after an inverse insert was assigned a
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationEntry.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationEntry.cs
+index 14607aa..222312a 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationEntry.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationEntry.cs
+@@ -10,9 +10,7 @@ public sealed record EditOperationEntry(
+     string OperationName,
+     string CaseKey,
+     DateTime RecordedAtUtc,
+-    IReadOnlyList<FeatureChange> Changes,
+-    bool IsUndoable = true,
+-    string? NotUndoableReason = null)
++    IReadOnlyList<FeatureChange> Changes)
+ {
+     public static EditOperationEntry Create(
+         string operationName,
+@@ -28,9 +26,6 @@ public sealed record EditOperationEntry(
+     public IReadOnlyList<FeatureChange> InverseChanges() =>
+         [.. Changes.Reverse().Select(change => change.Inverse())];
+ 
+-    public EditOperationEntry AsNotUndoable(string reason) =>
+-        this with { IsUndoable = false, NotUndoableReason = reason };
+-
+     public long ApproximateSizeInBytes() => Changes.Sum(change => change.ApproximateSizeInBytes());
+ 
+     public bool References(FeatureIdentity identity) =>
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChange.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChange.cs
+index d05e71b..b561b6d 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChange.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChange.cs
+@@ -4,12 +4,23 @@ namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
+ /// One primitive row delta. Every committed operation is recorded as an ordered list of
+ /// these, which is what lets a single generic applier reverse merge, split, delete and the
+ /// multi table creates without an inverse handler per operation family.
++/// <para>
++/// Which snapshots a change carries is fixed by its kind: an insert has only an after, a
++/// delete has only a before, an update has both. That pairing is checked on construction,
++/// so a change that reaches any other code is known to be well formed and Reference,
++/// Identity and Inverse can rely on it.
++/// </para>
+ /// </summary>
+ public sealed record FeatureChange(
+     FeatureChangeKind Kind,
+     FeatureSnapshot? Before,
+     FeatureSnapshot? After)
+ {
++    // A field initialiser runs inside the primary constructor, so this validates every
++    // direct construction. Build changes through the factories below rather than with a
++    // with expression, which copies fields and would not re-run this.
++    private readonly bool wellFormed = Validate(Kind, Before, After);
++
+     public static FeatureChange Insert(FeatureSnapshot after) => new(FeatureChangeKind.Insert, null, after);
+ 
+     public static FeatureChange Update(FeatureSnapshot before, FeatureSnapshot after) =>
+@@ -21,8 +32,7 @@ public sealed record FeatureChange(
+     /// The snapshot describing the row as it should exist after this change was applied, or
+     /// the pre-edit snapshot for a delete, which is the only thing left to identify it by.
+     /// </summary>
+-    public FeatureSnapshot Reference => After ?? Before
+-        ?? throw new InvalidOperationException("A feature change must carry a before or an after snapshot.");
++    public FeatureSnapshot Reference => After ?? Before!;
+ 
+     public FeatureIdentity Identity => Reference.Identity;
+ 
+@@ -32,12 +42,40 @@ public sealed record FeatureChange(
+     /// </summary>
+     public FeatureChange Inverse() => Kind switch
+     {
+-        FeatureChangeKind.Insert => new FeatureChange(FeatureChangeKind.Delete, After, null),
+-        FeatureChangeKind.Delete => new FeatureChange(FeatureChangeKind.Insert, null, Before),
+-        FeatureChangeKind.Update => new FeatureChange(FeatureChangeKind.Update, After, Before),
++        FeatureChangeKind.Insert => Delete(After!),
++        FeatureChangeKind.Delete => Insert(Before!),
++        FeatureChangeKind.Update => Update(After!, Before!),
++        _ => throw new InvalidOperationException($"Unsupported change kind: {Kind}.")
++    };
++
++    /// <summary>
++    /// The same change with its snapshots replaced, used when an object id is rewritten.
++    /// Routed through the factories so the result is validated like any other change.
++    /// </summary>
++    public FeatureChange WithSnapshots(FeatureSnapshot? before, FeatureSnapshot? after) => Kind switch
++    {
++        FeatureChangeKind.Insert => Insert(after!),
++        FeatureChangeKind.Delete => Delete(before!),
++        FeatureChangeKind.Update => Update(before!, after!),
+         _ => throw new InvalidOperationException($"Unsupported change kind: {Kind}.")
+     };
+ 
+     public long ApproximateSizeInBytes() =>
+         (Before?.ApproximateSizeInBytes() ?? 0) + (After?.ApproximateSizeInBytes() ?? 0);
++
++    private static bool Validate(FeatureChangeKind kind, FeatureSnapshot? before, FeatureSnapshot? after)
++    {
++        var ok = kind switch
++        {
++            FeatureChangeKind.Insert => before is null && after is not null,
++            FeatureChangeKind.Delete => before is not null && after is null,
++            FeatureChangeKind.Update => before is not null && after is not null,
++            _ => false
++        };
++
++        return ok
++            ? true
++            : throw new ArgumentException(
++                $"A {kind} change carries the wrong snapshots. Insert needs an after, delete needs a before, update needs both.");
++    }
+ }
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshot.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshot.cs
+index 62060b5..a850892 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshot.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshot.cs
+@@ -12,8 +12,11 @@ public sealed record FeatureSnapshot(
+     IReadOnlyDictionary<string, object?> Attributes)
+ {
+     /// <summary>
+-    /// Approximate memory cost, used by the journal size guard. Attribute values are counted
+-    /// by their string length, which is close enough to rank an entry against a byte budget.
++    /// Approximate memory cost, used by the journal to keep the whole history inside its
++    /// budget. Strings are measured directly rather than through ToString, which would
++    /// allocate a string per attribute purely to read its length. Non string values are
++    /// counted as a small fixed size, which is close enough to rank an entry against a
++    /// budget measured in tens of megabytes.
+     /// </summary>
+     public long ApproximateSizeInBytes()
+     {
+@@ -22,7 +25,12 @@ public sealed record FeatureSnapshot(
+         foreach (var pair in Attributes)
+         {
+             total += pair.Key.Length * 2L;
+-            total += (pair.Value?.ToString()?.Length ?? 0) * 2L;
++            total += pair.Value switch
++            {
++                null => 0,
++                string s => s.Length * 2L,
++                _ => 8L
++            };
+         }
+ 
+         return total;
+diff --git a/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs b/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs
+index 911729c..a86afeb 100644
+--- a/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs
++++ b/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs
+@@ -1,8 +1,9 @@
+ namespace WG.MiEditor.Configuration.AppSettings;
+ 
+ /// <summary>
+-/// Bounds the edit history. MaxUndoDepth is the number of operations kept, and
+-/// MaxEntrySizeInBytes guards against a single very large operation, which is recorded but
+-/// flagged as not undoable rather than held in memory.
++/// Bounds the edit history. MaxUndoDepth is how many operations are kept.
++/// MaxTotalBytes bounds what the whole history may hold, across both the undo and the redo
++/// side, so a few very large operations cannot sit inside the depth cap and still consume
++/// an unbounded amount of memory. The oldest operations are evicted until the total fits.
+ /// </summary>
+-public record EditHistoryInfo(int MaxUndoDepth = 10, long MaxEntrySizeInBytes = 8L * 1024 * 1024);
++public record EditHistoryInfo(int MaxUndoDepth = 10, long MaxTotalBytes = 64L * 1024 * 1024);
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryJournalTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryJournalTests.cs
+index ff747a3..5cebca8 100644
+--- a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryJournalTests.cs
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryJournalTests.cs
+@@ -1,3 +1,4 @@
++using WG.MiEditor.Configuration.AppSettings;
+ using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using static WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.EditHistoryTestData;
+ 
+@@ -5,7 +6,7 @@ namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
+ 
+ public class EditHistoryJournalTests
+ {
+-    private readonly EditHistoryJournal sut = new(maxDepth: 10);
++    private readonly EditHistoryJournal sut = new(new EditHistoryInfo(MaxUndoDepth: 10));
+ 
+     [Fact]
+     public void NewJournal_OffersNeitherUndoNorRedo()
+@@ -172,16 +173,44 @@ public class EditHistoryJournalTests
+     }
+ 
+     [Fact]
+-    public void OversizedOperation_IsRecordedButFlaggedNotUndoable()
++    public void AnOperationLargerThanTheWholeBudget_IsRefusedAndLeavesTheHistoryIntact()
+     {
+-        var journal = new EditHistoryJournal(maxDepth: 10, maxEntrySizeInBytes: 8);
++        var journal = new EditHistoryJournal(new EditHistoryInfo(MaxUndoDepth: 10, MaxTotalBytes: 2000));
++        journal.Record(CreateEntry("Earlier work"));
+ 
+-        journal.Record(CreateEntry(changes: [FeatureChange.Insert(CreateSnapshot(1, "100", geometryJson: new string('x', 5000)))]));
++        var recorded = journal.Record(CreateEntry("Enormous", changes:
++            [FeatureChange.Insert(CreateSnapshot(1, "100", geometryJson: new string('x', 5000)))]));
+ 
++        Assert.False(recorded);
+         Assert.Equal(1, journal.UndoDepth);
+-        Assert.False(journal.CanUndo);
+-        Assert.False(journal.PeekUndo()!.IsUndoable);
+-        Assert.NotNull(journal.PeekUndo()!.NotUndoableReason);
++        Assert.True(journal.CanUndo);
++        Assert.Equal("Earlier work", journal.PeekUndo()!.OperationName);
++    }
++
++    [Fact]
++    public void ALargeOperationEvictsOlderOnesRatherThanBlockingUndo()
++    {
++        var large = CreateEntry("Large", changes:
++            [FeatureChange.Insert(CreateSnapshot(1, "100", geometryJson: new string('x', 2500)))]);
++
++        // Room for the large operation and a couple of small ones, but not for five as well,
++        // so recording the large one has to evict rather than refuse.
++        var budget = large.ApproximateSizeInBytes() + (CreateEntry().ApproximateSizeInBytes() * 2);
++        var journal = new EditHistoryJournal(new EditHistoryInfo(MaxUndoDepth: 10, MaxTotalBytes: budget));
++
++        for (var i = 0; i < 5; i++)
++        {
++            journal.Record(CreateEntry($"Small {i}"));
++        }
++
++        Assert.Equal(5, journal.UndoDepth);
++
++        var recorded = journal.Record(large);
++
++        Assert.True(recorded);
++        Assert.True(journal.CanUndo);
++        Assert.Equal("Large", journal.PeekUndo()!.OperationName);
++        Assert.True(journal.UndoDepth < 6);
+     }
+ 
+     [Fact]
+@@ -205,7 +234,7 @@ public class EditHistoryJournalTests
+         sut.Changed += (_, _) => raised++;
+ 
+         sut.Clear();
+-        sut.DiscardRedoFrom();
++        sut.ClearRedo();
+         sut.DropEntriesReferencing([]);
+ 
+         Assert.Equal(0, raised);
+@@ -214,7 +243,7 @@ public class EditHistoryJournalTests
+     [Fact]
+     public void Constructor_RejectsANonPositiveDepth()
+     {
+-        Assert.Throws<ArgumentOutOfRangeException>(() => new EditHistoryJournal(maxDepth: 0));
++        Assert.Throws<ArgumentOutOfRangeException>(() => new EditHistoryJournal(new EditHistoryInfo(MaxUndoDepth: 0)));
+     }
+ 
+     [Fact]
+@@ -233,6 +262,36 @@ public class EditHistoryJournalTests
+         Assert.Equal(1, sut.UndoDepth);
+     }
+ 
++    [Fact]
++    public void ClearRedo_EmptiesAPopulatedRedoStack()
++    {
++        sut.Record(CreateEntry());
++        sut.PopUndoToRedo();
++        Assert.Equal(1, sut.RedoDepth);
++
++        sut.ClearRedo();
++
++        Assert.Equal(0, sut.RedoDepth);
++        Assert.False(sut.CanRedo);
++    }
++
++    [Fact]
++    public void PeekRedo_ReturnsTheEntryThatRedoWouldReapply()
++    {
++        var entry = CreateEntry("Merge");
++        sut.Record(entry);
++        sut.PopUndoToRedo();
++
++        Assert.Equal(entry.Id, sut.PeekRedo()!.Id);
++        Assert.Equal(1, sut.RedoDepth);
++    }
++
++    [Fact]
++    public void Record_ReturnsTrueWhenTheOperationIsKept()
++    {
++        Assert.True(sut.Record(CreateEntry()));
++    }
++
+     private List<string> DrainUndoNames()
+     {
+         var names = new List<string>();
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureChangeTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureChangeTests.cs
+index 27abaa7..8565e8d 100644
+--- a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureChangeTests.cs
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureChangeTests.cs
+@@ -68,6 +68,39 @@ public class FeatureChangeTests
+         Assert.All(inverse, change => Assert.Equal(FeatureChangeKind.Delete, change.Kind));
+     }
+ 
++    [Theory]
++    [InlineData(FeatureChangeKind.Insert)]
++    [InlineData(FeatureChangeKind.Delete)]
++    [InlineData(FeatureChangeKind.Update)]
++    public void AChangeCarryingTheWrongSnapshots_IsRefusedAtConstruction(FeatureChangeKind kind)
++    {
++        Assert.Throws<ArgumentException>(() => new FeatureChange(kind, null, null));
++    }
++
++    [Fact]
++    public void AnInsertCarryingABeforeSnapshot_IsRefused()
++    {
++        Assert.Throws<ArgumentException>(
++            () => new FeatureChange(FeatureChangeKind.Insert, CreateSnapshot(1, "100"), CreateSnapshot(1, "100")));
++    }
++
++    [Fact]
++    public void ADeleteCarryingAnAfterSnapshot_IsRefused()
++    {
++        Assert.Throws<ArgumentException>(
++            () => new FeatureChange(FeatureChangeKind.Delete, CreateSnapshot(1, "100"), CreateSnapshot(1, "100")));
++    }
++
++    [Fact]
++    public void WithSnapshots_KeepsTheKindAndValidatesTheResult()
++    {
++        var original = FeatureChange.Update(CreateSnapshot(1, "100"), CreateSnapshot(1, "100"));
++        var moved = original.WithSnapshots(CreateSnapshot(2, "100"), CreateSnapshot(2, "100"));
++
++        Assert.Equal(FeatureChangeKind.Update, moved.Kind);
++        Assert.Equal(2, moved.Identity.ObjectId);
++    }
++
+     [Fact]
+     public void Reference_FallsBackToTheBeforeSnapshotForADelete()
+     {
