@@ -1,0 +1,4137 @@
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/Attributes/AttributionModelService.cs b/Src/MiEditor.Core/Services/Drawing/Editing/Attributes/AttributionModelService.cs
+index 79e4d20..dc46ce7 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/Attributes/AttributionModelService.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/Attributes/AttributionModelService.cs
+@@ -2,6 +2,7 @@
+ using Esri.ArcGISRuntime.Data;
+ using System.Collections.ObjectModel;
+ using System.Globalization;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.Logging.Abstractions;
+ using WG.MiEditor.MainApp.ViewModels.Editing.Attributes;
+ using WG.MiEditor.Models.MIEditorLayerConfig;
+@@ -20,7 +21,8 @@ public class AttributionModelService(
+     IEnumerable<IAttributionModelStrategy> strategies,
+     ICaseContext caseContext,
+     IUserContext userContext,
+-    IJsonUtilityService jsonUtilityService) : IAttributionModelService
++    IJsonUtilityService jsonUtilityService,
++    IEditOperationRecorder editRecorder) : IAttributionModelService
+ {
+     private readonly Dictionary<AttributionMode, IAttributionModelStrategy> strategies = strategies.ToDictionary(s => s.Mode, s => s);
+     private const string constPicker = "Picker";
+@@ -64,7 +66,13 @@ public class AttributionModelService(
+         AttributionMode mode,
+         bool isOffline)
+     {               
+-        FeatureTable? featureServiceTable = null; 
++        FeatureTable? featureServiceTable = null;
++
++        // Watches this save so it can be undone. Creating a feature is the only mode recorded so
++        // far; a modify has to restore prior values across the related tables too, which is a
++        // later delivery. Disposed without a commit if anything below throws, so a failed save
++        // records nothing.
++        using var editScope = editRecorder.Begin(OperationNameFor(mode, targetLayer));
+ 
+         try
+         {
+@@ -85,6 +93,7 @@ public class AttributionModelService(
+                 case AttributionMode.New:
+                 case AttributionMode.Import:
+                 case AttributionMode.ImportSketch:
++                    editScope.MarkInsert(targetLayer, feature);
+                     await featureServiceTable.AddFeatureAsync(feature);
+                     break;
+ 
+@@ -112,6 +121,10 @@ public class AttributionModelService(
+                 }
+             }
+ 
++            // The edit is on the server now, so the record is kept. Reads the row back to pick up
++            // the object id the service assigned, which is why this runs after ApplyEdits.
++            await editScope.CommitAsync();
++
+             return true;
+         }
+         catch (Exception ex)
+@@ -126,6 +139,20 @@ public class AttributionModelService(
+             return false;
+         }
+     }
++    /// <summary>
++    /// What the user is told was undone, so it reads as the action they took rather than as the
++    /// mode the code was in.
++    /// </summary>
++    private static string OperationNameFor(AttributionMode mode, string targetLayer) => mode switch
++    {
++        AttributionMode.New => $"Add {targetLayer}",
++        AttributionMode.Import => $"Import {targetLayer}",
++        AttributionMode.ImportSketch => $"Import sketch to {targetLayer}",
++        AttributionMode.Modify => $"Edit {targetLayer} attributes",
++        AttributionMode.ModifySketch => $"Edit sketch attributes",
++        _ => $"Edit {targetLayer}"
++    };
++
+     private static bool IsModified(AttributionMode mode) => mode == AttributionMode.Modify || mode == AttributionMode.ModifySketch || mode == AttributionMode.Import || mode == AttributionMode.ImportSketch;
+ 
+     private async Task SaveAttributesToFeature(
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditConflictDetector.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditConflictDetector.cs
+new file mode 100644
+index 0000000..85335fb
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditConflictDetector.cs
+@@ -0,0 +1,165 @@
++using Esri.ArcGISRuntime.Geometry;
++using WG.MiEditor.Shared.AutoScanning;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Refuses an undo or a redo when the rows it would touch no longer look the way the history
++/// recorded them, which means somebody else has edited them in the meantime.
++/// <para>
++/// The comparison is on the layer's own last changed attribute, which differs by layer, plus the
++/// geometry. Both sides are produced by FeatureStateReader so they cannot drift on formatting.
++/// </para>
++/// <para>
++/// The live rows are fetched one query per layer and key strategy rather than one per change. A
++/// single feature is the same either way, but an operation touching twenty rows would otherwise
++/// cost twenty sequential round trips before anything could be applied.
++/// </para>
++/// </summary>
++[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IEditConflictDetector) })]
++public sealed class EditConflictDetector(IFeatureStateReader stateReader) : IEditConflictDetector
++{
++    public async Task<ConflictResult> CheckAsync(EditOperationEntry entry, EditHistoryDirection direction)
++    {
++        ArgumentNullException.ThrowIfNull(entry);
++
++        if (entry.Changes.Count == 0)
++        {
++            return ConflictResult.None;
++        }
++
++        var live = await ReadLiveRowsAsync(entry);
++
++        foreach (var change in entry.Changes)
++        {
++            var result = Check(change, direction, live);
++
++            if (result.HasConflict)
++            {
++                return result;
++            }
++        }
++
++        return ConflictResult.None;
++    }
++
++    /// <summary>
++    /// Every row the entry mentions, as it stands now. Rows that have since been deleted are
++    /// simply absent, which is what the checks below rely on.
++    /// </summary>
++    private async Task<List<FeatureSnapshot>> ReadLiveRowsAsync(EditOperationEntry entry)
++    {
++        var live = new List<FeatureSnapshot>();
++
++        var byLayer = entry.Changes
++            .Select(c => c.Identity)
++            .GroupBy(i => i.LayerName, StringComparer.OrdinalIgnoreCase);
++
++        foreach (var layer in byLayer)
++        {
++            // Grouped by key strategy as well as by layer. A keyed layer still yields a keyless
++            // identity whenever the key attribute is null, and the two need different fields, so a
++            // mixed batch would leave some rows unqueried and they would read as deleted.
++            foreach (var sameStrategy in layer.GroupBy(i => i.HasBusinessKey))
++            {
++                // Distinct because an operation can touch the same row more than once, and reading
++                // it twice would tell us nothing new.
++                live.AddRange(await stateReader.ReadManyAsync(layer.Key, Distinct(sameStrategy)));
++            }
++        }
++
++        return live;
++    }
++
++    /// <summary>
++    /// Deduplicated on SameRowAs rather than on equality, because two identities can name the same
++    /// row while differing on the object id, which is exactly what happens after a restore.
++    /// </summary>
++    private static List<FeatureIdentity> Distinct(IEnumerable<FeatureIdentity> identities)
++    {
++        var distinct = new List<FeatureIdentity>();
++
++        foreach (var identity in identities)
++        {
++            if (!distinct.Any(seen => seen.SameRowAs(identity)))
++            {
++                distinct.Add(identity);
++            }
++        }
++
++        return distinct;
++    }
++
++    private static ConflictResult Check(
++        FeatureChange change,
++        EditHistoryDirection direction,
++        List<FeatureSnapshot> live)
++    {
++        // Undoing compares against what the operation left behind; redoing compares against what
++        // it started from, because an undo has since put the row back to that.
++        var expected = direction == EditHistoryDirection.Undo ? change.After : change.Before;
++
++        // No expected state means the row is not supposed to exist at this point, so the check is
++        // that nothing has appeared in its place.
++        if (expected is null)
++        {
++            var reference = change.Reference;
++
++            return Find(live, reference.Identity) is null
++                ? ConflictResult.None
++                : ConflictResult.Conflict(
++                    "A feature this operation had removed has been created again by someone else.",
++                    reference.Identity);
++        }
++
++        var current = Find(live, expected.Identity);
++
++        if (current is null)
++        {
++            return ConflictResult.Conflict(
++                "A feature this operation touched has been deleted by someone else.",
++                expected.Identity);
++        }
++
++        if (current.StampValue != expected.StampValue)
++        {
++            return ConflictResult.Conflict(
++                "A feature this operation touched has been changed by someone else.",
++                expected.Identity);
++        }
++
++        return GeometryMatches(expected.GeometryJson, current.GeometryJson)
++            ? ConflictResult.None
++            : ConflictResult.Conflict(
++                "The shape of a feature this operation touched has been changed by someone else.",
++                expected.Identity);
++    }
++
++    private static FeatureSnapshot? Find(List<FeatureSnapshot> live, FeatureIdentity identity) =>
++        live.FirstOrDefault(s => s.Identity.SameRowAs(identity));
++
++    /// <summary>
++    /// Compared as text first, which is the common case and costs nothing. Only when that differs
++    /// is the geometry rebuilt and compared properly, because the service can return the same
++    /// shape written differently and that must not read as somebody else's edit.
++    /// </summary>
++    private static bool GeometryMatches(string? expected, string? live)
++    {
++        if (string.Equals(expected, live, StringComparison.Ordinal))
++        {
++            return true;
++        }
++
++        if (expected is null || live is null)
++        {
++            return false;
++        }
++
++        var expectedGeometry = Geometry.FromJson(expected);
++        var liveGeometry = Geometry.FromJson(live);
++
++        return expectedGeometry is not null
++            && liveGeometry is not null
++            && GeometryEngine.Equals(expectedGeometry, liveGeometry);
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryJournal.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryJournal.cs
+new file mode 100644
+index 0000000..fb318f9
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryJournal.cs
+@@ -0,0 +1,377 @@
++using WG.MiEditor.Configuration.AppSettings;
++using WG.MiEditor.Shared.AutoScanning;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Keeps the most recent operations available for undo and redo. Backed by linked lists
++/// rather than a stack because the oldest entry has to be evicted once a cap is reached,
++/// which a stack cannot do. Entries move between the two lists rather than being copied, and
++/// recording clears redo, so the combined depth never exceeds the cap.
++/// <para>
++/// Two caps apply: how many operations are kept, and how much they may hold in total. The
++/// oldest are evicted until both are satisfied, so memory stays bounded without any single
++/// operation being singled out and refused. Only an operation larger than the entire budget
++/// cannot be held, and Record reports that rather than recording something unusable.
++/// </para>
++/// <para>
++/// Recording happens on whichever thread finished the edit, while undo is driven from the
++/// UI, so every member takes a lock. Contention is not a concern at this size, and the cost
++/// of getting it wrong once the callers exist is far higher than the cost of the lock.
++/// </para>
++/// </summary>
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IEditHistoryJournal) })]
++public sealed class EditHistoryJournal : IEditHistoryJournal
++{
++    private readonly LinkedList<EditOperationEntry> undo = new();
++    private readonly LinkedList<EditOperationEntry> redo = new();
++    private readonly object gate = new();
++    private readonly int maxDepth;
++    private readonly long maxTotalBytes;
++
++    /// <summary>
++    /// Falls back to the EditHistoryInfo defaults, which own the values so they are not
++    /// repeated here. The container prefers the constructor taking EditHistoryInfo wherever
++    /// that is registered; this keeps the journal constructible where it is not.
++    /// </summary>
++    public EditHistoryJournal()
++        : this(new EditHistoryInfo())
++    {
++    }
++
++    public EditHistoryJournal(EditHistoryInfo settings)
++    {
++        ArgumentNullException.ThrowIfNull(settings);
++        ArgumentOutOfRangeException.ThrowIfLessThan(settings.MaxUndoDepth, 1);
++        ArgumentOutOfRangeException.ThrowIfLessThan(settings.MaxTotalBytes, 1);
++
++        maxDepth = settings.MaxUndoDepth;
++        maxTotalBytes = settings.MaxTotalBytes;
++    }
++
++    public event EventHandler? Changed;
++
++    public bool CanUndo
++    {
++        get { lock (gate) { return undo.Count > 0; } }
++    }
++
++    public bool CanRedo
++    {
++        get { lock (gate) { return redo.Count > 0; } }
++    }
++
++    public int UndoDepth
++    {
++        get { lock (gate) { return undo.Count; } }
++    }
++
++    public int RedoDepth
++    {
++        get { lock (gate) { return redo.Count; } }
++    }
++
++    public bool Record(EditOperationEntry entry)
++    {
++        ArgumentNullException.ThrowIfNull(entry);
++
++        bool recorded;
++        bool changed;
++
++        lock (gate)
++        {
++            // An operation has happened, so whatever sat on the redo side can no longer be
++            // reached from the current state. That is true whether or not this operation is
++            // small enough to keep, which is why it is cleared before the size is considered.
++            changed = redo.Count > 0;
++            redo.Clear();
++
++            // Nothing is gained by evicting the whole history to make room for one operation
++            // that still would not fit, so the undo side is left alone and the caller is told.
++            recorded = entry.ApproximateSizeInBytes() <= maxTotalBytes;
++
++            if (recorded)
++            {
++                undo.AddLast(entry);
++                changed = true;
++
++                while (undo.Count > maxDepth)
++                {
++                    undo.RemoveFirst();
++                }
++
++                // The entry just added is known to fit on its own, so this always terminates
++                // with at least that one entry still in the list.
++                while (undo.Count > 1 && TotalSize() > maxTotalBytes)
++                {
++                    undo.RemoveFirst();
++                }
++            }
++        }
++
++        if (changed)
++        {
++            RaiseChanged();
++        }
++
++        return recorded;
++    }
++
++    public EditOperationEntry? PeekUndo()
++    {
++        lock (gate) { return undo.Last?.Value; }
++    }
++
++    public EditOperationEntry? PeekRedo()
++    {
++        lock (gate) { return redo.Last?.Value; }
++    }
++
++    public EditOperationEntry? PopUndoToRedo()
++    {
++        EditOperationEntry? entry;
++
++        lock (gate)
++        {
++            entry = RemoveLast(undo);
++            if (entry is null)
++            {
++                return null;
++            }
++
++            redo.AddLast(entry);
++        }
++
++        RaiseChanged();
++
++        return entry;
++    }
++
++    public EditOperationEntry? PopRedoToUndo()
++    {
++        EditOperationEntry? entry;
++
++        lock (gate)
++        {
++            entry = RemoveLast(redo);
++            if (entry is null)
++            {
++                return null;
++            }
++
++            undo.AddLast(entry);
++        }
++
++        RaiseChanged();
++
++        return entry;
++    }
++
++    public EditOperationEntry? DiscardUndo()
++    {
++        EditOperationEntry? entry;
++
++        lock (gate)
++        {
++            entry = RemoveLast(undo);
++        }
++
++        if (entry is not null)
++        {
++            RaiseChanged();
++        }
++
++        return entry;
++    }
++
++    public void ClearRedo()
++    {
++        lock (gate)
++        {
++            if (redo.Count == 0)
++            {
++                return;
++            }
++
++            redo.Clear();
++        }
++
++        RaiseChanged();
++    }
++
++    public void RemapObjectId(string layerName, long oldObjectId, long newObjectId)
++    {
++        if (oldObjectId == newObjectId)
++        {
++            return;
++        }
++
++        bool remapped;
++
++        lock (gate)
++        {
++            remapped = Remap(undo, layerName, oldObjectId, newObjectId);
++            remapped |= Remap(redo, layerName, oldObjectId, newObjectId);
++        }
++
++        if (remapped)
++        {
++            RaiseChanged();
++        }
++    }
++
++    public int DropEntriesReferencing(IReadOnlyCollection<FeatureIdentity> identities)
++    {
++        ArgumentNullException.ThrowIfNull(identities);
++
++        if (identities.Count == 0)
++        {
++            return 0;
++        }
++
++        int dropped;
++
++        lock (gate)
++        {
++            dropped = Drop(undo, identities) + Drop(redo, identities);
++        }
++
++        if (dropped > 0)
++        {
++            RaiseChanged();
++        }
++
++        return dropped;
++    }
++
++    public void Clear()
++    {
++        lock (gate)
++        {
++            if (undo.Count == 0 && redo.Count == 0)
++            {
++                return;
++            }
++
++            undo.Clear();
++            redo.Clear();
++        }
++
++        RaiseChanged();
++    }
++
++    /// <summary>
++    /// Recomputed rather than tracked incrementally. Entries are added and removed at six
++    /// points across two lists, and a running total would have to be kept correct at every
++    /// one of them. At ten entries the walk costs nothing, so the simpler code that is
++    /// obviously right is the better trade.
++    /// </summary>
++    private long TotalSize()
++    {
++        long total = 0;
++
++        foreach (var entry in undo)
++        {
++            total += entry.ApproximateSizeInBytes();
++        }
++
++        foreach (var entry in redo)
++        {
++            total += entry.ApproximateSizeInBytes();
++        }
++
++        return total;
++    }
++
++    private static EditOperationEntry? RemoveLast(LinkedList<EditOperationEntry> list)
++    {
++        var last = list.Last;
++        if (last is null)
++        {
++            return null;
++        }
++
++        list.RemoveLast();
++
++        return last.Value;
++    }
++
++    private static bool Remap(
++        LinkedList<EditOperationEntry> list,
++        string layerName,
++        long oldObjectId,
++        long newObjectId)
++    {
++        var changed = false;
++
++        for (var node = list.First; node is not null; node = node.Next)
++        {
++            var entry = node.Value;
++            var changes = new List<FeatureChange>(entry.Changes.Count);
++            var entryChanged = false;
++
++            foreach (var change in entry.Changes)
++            {
++                var before = RemapSnapshot(change.Before, layerName, oldObjectId, newObjectId);
++                var after = RemapSnapshot(change.After, layerName, oldObjectId, newObjectId);
++
++                if (ReferenceEquals(before, change.Before) && ReferenceEquals(after, change.After))
++                {
++                    changes.Add(change);
++                    continue;
++                }
++
++                entryChanged = true;
++                changes.Add(change.WithSnapshots(before, after));
++            }
++
++            if (entryChanged)
++            {
++                node.Value = entry with { Changes = changes };
++                changed = true;
++            }
++        }
++
++        return changed;
++    }
++
++    private static FeatureSnapshot? RemapSnapshot(
++        FeatureSnapshot? snapshot,
++        string layerName,
++        long oldObjectId,
++        long newObjectId)
++    {
++        if (snapshot is null
++            || snapshot.Identity.ObjectId != oldObjectId
++            || !string.Equals(snapshot.Identity.LayerName, layerName, StringComparison.OrdinalIgnoreCase))
++        {
++            return snapshot;
++        }
++
++        return snapshot with { Identity = snapshot.Identity with { ObjectId = newObjectId } };
++    }
++
++    private static int Drop(LinkedList<EditOperationEntry> list, IReadOnlyCollection<FeatureIdentity> identities)
++    {
++        var dropped = 0;
++        var node = list.First;
++
++        while (node is not null)
++        {
++            var next = node.Next;
++
++            if (identities.Any(identity => node.Value.References(identity)))
++            {
++                list.Remove(node);
++                dropped++;
++            }
++
++            node = next;
++        }
++
++        return dropped;
++    }
++
++    // Raised outside the lock so a handler that calls back into the journal cannot deadlock.
++    private void RaiseChanged() => Changed?.Invoke(this, EventArgs.Empty);
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryService.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryService.cs
+new file mode 100644
+index 0000000..3c6aaab
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryService.cs
+@@ -0,0 +1,206 @@
++using CommunityToolkit.Mvvm.Messaging;
++using WG.MiEditor.Core.Services.Drawing.Editing.Managers;
++using WG.MiEditor.Core.Services.Feedback;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Messages.CaseManagement;
++using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Helpers;
++using WG.MiEditor.Shared.Messages.Map;
++using WG.MiEditor.Shared.Messages.Toolbar;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Drives undo and redo: the safety checks in order, then the conflict check and the applier.
++/// <para>
++/// Scoped because the applier and the conflict check need IFeatureLayerService, which is
++/// Scoped. No scope is ever created in this application, so this is a singleton in practice,
++/// which is what the journal subscription relies on.
++/// </para>
++/// </summary>
++[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IEditHistoryService) })]
++public sealed class EditHistoryService : IEditHistoryService
++{
++    private const string SpinnerKey = "EditHistory";
++
++    private readonly IEditHistoryJournal journal;
++    private readonly IEditConflictDetector conflictDetector;
++    private readonly IFeatureChangeApplier applier;
++    private readonly IEditingOperationsManager editingOperations;
++    private readonly IEditSelectionClearer selectionClearer;
++    private readonly IOperationFeedbackService feedback;
++    private readonly ICaseContext caseContext;
++    private readonly IMessenger messenger;
++    private readonly ILoggerService loggerService;
++
++    // Guards a second press while one is in flight. The toolbar button fires without waiting,
++    // so a double click would otherwise start two of these at once.
++    private bool running;
++
++#pragma warning disable S107
++    public EditHistoryService(
++        IEditHistoryJournal journal,
++        IEditConflictDetector conflictDetector,
++        IFeatureChangeApplier applier,
++        IEditingOperationsManager editingOperations,
++        IEditSelectionClearer selectionClearer,
++        IOperationFeedbackService feedback,
++        ICaseContext caseContext,
++        IMessenger messenger,
++        ILoggerService loggerService)
++#pragma warning restore S107
++    {
++        this.journal = journal;
++        this.conflictDetector = conflictDetector;
++        this.applier = applier;
++        this.editingOperations = editingOperations;
++        this.selectionClearer = selectionClearer;
++        this.feedback = feedback;
++        this.caseContext = caseContext;
++        this.messenger = messenger;
++        this.loggerService = loggerService;
++
++        journal.Changed += OnJournalChanged;
++
++        // The history belongs to one case. Clearing on each of these is the primary guard;
++        // the case key stamped on every entry is the second, for a message that never arrives.
++        messenger.Register<EditHistoryService, SelectedCaseMessage>(this, (r, _) => r.ClearHistory());
++        messenger.Register<EditHistoryService, SelectedCaseStartEditingMessage>(this, (r, _) => r.ClearHistory());
++        messenger.Register<EditHistoryService, SelectedCaseStopEditingMessage>(this, (r, _) => r.ClearHistory());
++        messenger.Register<EditHistoryService, ExitCaseMessage>(this, (r, _) => r.ClearHistory());
++    }
++
++    public bool CanUndo => journal.CanUndo;
++
++    public bool CanRedo => journal.CanRedo;
++
++    public Task UndoAsync() => RunAsync(EditHistoryDirection.Undo);
++
++    public Task RedoAsync() => RunAsync(EditHistoryDirection.Redo);
++
++    public void ClearHistory() => journal.Clear();
++
++    private async Task RunAsync(EditHistoryDirection direction)
++    {
++        if (running)
++        {
++            return;
++        }
++
++        running = true;
++
++        try
++        {
++            await feedback.RunAsync(
++                SpinnerKey,
++                () => ApplyAsync(direction),
++                errorTitle: Title(direction),
++                errorContext: Title(direction));
++        }
++        finally
++        {
++            running = false;
++        }
++    }
++
++    private async Task ApplyAsync(EditHistoryDirection direction)
++    {
++        var entry = direction == EditHistoryDirection.Undo ? journal.PeekUndo() : journal.PeekRedo();
++
++        if (entry is null)
++        {
++            return;
++        }
++
++        // Recorded against a different case. Clearing on the lifecycle messages should already
++        // have prevented this, so reaching here means one was missed.
++        if (!string.Equals(entry.CaseKey, caseContext.CaseNo ?? string.Empty, StringComparison.Ordinal))
++        {
++            loggerService.Warn(
++                $"Edit history: '{entry.OperationName}' belongs to case {entry.CaseKey} but the open case is {caseContext.CaseNo}. The history has been cleared.");
++            journal.Clear();
++            return;
++        }
++
++        // An editing tool may be holding the very feature that is about to change, so stand the
++        // tools down before touching anything.
++        await editingOperations.DeactivateAll(null);
++
++        var conflict = await conflictDetector.CheckAsync(entry, direction);
++
++        if (conflict.HasConflict)
++        {
++            Refuse(direction, entry, conflict);
++            return;
++        }
++
++        var changes = direction == EditHistoryDirection.Undo ? entry.InverseChanges() : entry.Changes;
++        var result = await applier.ApplyAsync(changes);
++
++        if (!result.Success)
++        {
++            // The data no longer matches anything recorded, so keeping the history would invite
++            // a later press to make it worse.
++            feedback.NotifyError(
++                Title(direction),
++                $"{entry.OperationName} could not be {Past(direction).ToLowerInvariant()}. The edit history has been cleared and the map will reload. {result.Error}");
++
++            journal.Clear();
++            messenger.Send(new RefreshMessage());
++            return;
++        }
++
++        foreach (var remap in result.Remaps)
++        {
++            journal.RemapObjectId(remap.LayerName, remap.OldObjectId, remap.NewObjectId);
++        }
++
++        if (direction == EditHistoryDirection.Undo)
++        {
++            journal.PopUndoToRedo();
++        }
++        else
++        {
++            journal.PopRedoToUndo();
++        }
++
++        // A restored row carries a new object id, so anything still selected would be pointing at
++        // a row that no longer exists.
++        await selectionClearer.ClearAsync();
++
++        feedback.NotifySuccess(Title(direction), $"{Past(direction)}: {entry.OperationName}");
++    }
++
++    private void Refuse(EditHistoryDirection direction, EditOperationEntry entry, ConflictResult conflict)
++    {
++        loggerService.Info(
++            $"Edit history: '{entry.OperationName}' was not {Past(direction).ToLowerInvariant()} because {conflict.Reason}");
++
++        if (direction == EditHistoryDirection.Undo)
++        {
++            journal.DiscardUndo();
++        }
++        else
++        {
++            // Redo entries are ordered and later ones can depend on earlier ones, so the rest of
++            // the redo side goes with it.
++            journal.ClearRedo();
++        }
++
++        // Anything else in either list touching the same rows is now just as unsafe.
++        journal.DropEntriesReferencing(conflict.Conflicting);
++
++        feedback.NotifyWarning(
++            Title(direction),
++            $"{entry.OperationName} cannot be {Past(direction).ToLowerInvariant()}. {conflict.Reason} It has been removed from your history.");
++    }
++
++    private static string Title(EditHistoryDirection direction) =>
++        direction == EditHistoryDirection.Undo ? "Undo" : "Redo";
++
++    private static string Past(EditHistoryDirection direction) =>
++        direction == EditHistoryDirection.Undo ? "Undone" : "Redone";
++
++    private void OnJournalChanged(object? sender, EventArgs e) =>
++        messenger.Send(new EditHistoryChangedMessage(journal.CanUndo, journal.CanRedo));
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationEntry.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationEntry.cs
+new file mode 100644
+index 0000000..222312a
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationEntry.cs
+@@ -0,0 +1,33 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// One user visible operation, however many rows or tables it touched. A single entry is a
++/// single press of undo. The case key is stamped at record time and re-checked before an
++/// undo, so history recorded against one case can never be applied against another.
++/// </summary>
++public sealed record EditOperationEntry(
++    Guid Id,
++    string OperationName,
++    string CaseKey,
++    DateTime RecordedAtUtc,
++    IReadOnlyList<FeatureChange> Changes)
++{
++    public static EditOperationEntry Create(
++        string operationName,
++        string caseKey,
++        IReadOnlyList<FeatureChange> changes,
++        DateTime recordedAtUtc) =>
++        new(Guid.NewGuid(), operationName, caseKey, recordedAtUtc, changes);
++
++    /// <summary>
++    /// The changes needed to reverse this operation: every delta inverted, applied in reverse
++    /// order so that child rows are removed before the parents they reference.
++    /// </summary>
++    public IReadOnlyList<FeatureChange> InverseChanges() =>
++        [.. Changes.Reverse().Select(change => change.Inverse())];
++
++    public long ApproximateSizeInBytes() => Changes.Sum(change => change.ApproximateSizeInBytes());
++
++    public bool References(FeatureIdentity identity) =>
++        Changes.Any(change => change.Identity.SameRowAs(identity));
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationRecorder.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationRecorder.cs
+new file mode 100644
+index 0000000..c4f31a1
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditOperationRecorder.cs
+@@ -0,0 +1,172 @@
++using Esri.ArcGISRuntime.Data;
++using WG.MiEditor.Core.Services.Feedback;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Helpers;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Hands out the scope that watches one operation.
++/// <para>
++/// Each call to Begin returns an independent scope and the recorder holds no state of its own.
++/// An earlier version kept the operation in progress in a field so that nested calls could join
++/// it, which was written for a multi service save two deliveries away. It was the source of two
++/// defects: one exception on the commit path left that field pointing at a dead scope and
++/// silently stopped all recording, and two overlapping operations recorded into one entry. When
++/// a single entry spanning several services is genuinely needed, pass the scope down the call
++/// chain rather than reintroducing ambient state.
++/// </para>
++/// </summary>
++[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IEditOperationRecorder) })]
++public sealed class EditOperationRecorder(
++    IEditHistoryJournal journal,
++    IFeatureSnapshotFactory snapshotFactory,
++    IFeatureStateReader stateReader,
++    ICaseContext caseContext,
++    IOperationFeedbackService feedback,
++    ILoggerService loggerService) : IEditOperationRecorder
++{
++    public IEditOperationScope Begin(string operationName) =>
++        new Scope(journal, snapshotFactory, stateReader, caseContext, feedback, loggerService, operationName);
++
++    private sealed class Scope(
++        IEditHistoryJournal journal,
++        IFeatureSnapshotFactory snapshotFactory,
++        IFeatureStateReader stateReader,
++        ICaseContext caseContext,
++        IOperationFeedbackService feedback,
++        ILoggerService loggerService,
++        string operationName) : IEditOperationScope
++    {
++        private readonly List<Pending> pending = [];
++        private bool finished;
++
++        public void MarkInsert(string layerName, Feature feature)
++        {
++            ArgumentNullException.ThrowIfNull(feature);
++            pending.Add(new Pending(FeatureChangeKind.Insert, layerName, feature, null));
++        }
++
++        public async Task CaptureUpdateBeforeAsync(string layerName, Feature feature)
++        {
++            ArgumentNullException.ThrowIfNull(feature);
++
++            var before = await snapshotFactory.CreateAsync(layerName, feature);
++            pending.Add(new Pending(FeatureChangeKind.Update, layerName, feature, before));
++        }
++
++        public async Task CaptureDeleteAsync(string layerName, Feature feature)
++        {
++            ArgumentNullException.ThrowIfNull(feature);
++
++            var before = await snapshotFactory.CreateAsync(layerName, feature);
++            pending.Add(new Pending(FeatureChangeKind.Delete, layerName, feature, before));
++        }
++
++        public async Task CommitAsync()
++        {
++            // Committing twice would record the operation twice, and a caller that retries after
++            // a failure is a realistic way to reach here.
++            if (finished)
++            {
++                loggerService.Warn(
++                    $"Edit history: '{operationName}' was committed more than once. The second commit recorded nothing.");
++                return;
++            }
++
++            try
++            {
++                var changes = new List<FeatureChange>(pending.Count);
++
++                foreach (var item in pending)
++                {
++                    var change = await BuildChangeAsync(item);
++
++                    if (change is not null)
++                    {
++                        changes.Add(change);
++                    }
++                }
++
++                if (changes.Count == 0)
++                {
++                    return;
++                }
++
++                var entry = EditOperationEntry.Create(
++                    operationName,
++                    caseContext.CaseNo ?? string.Empty,
++                    changes,
++                    DateTime.UtcNow);
++
++                if (!journal.Record(entry))
++                {
++                    // Told here rather than returned for the caller to relay. Every service that
++                    // records would otherwise have to remember to, and the first one did not.
++                    loggerService.Warn(
++                        $"Edit history: '{operationName}' is larger than the whole history budget, so it cannot be undone.");
++
++                    feedback.NotifyWarning(
++                        "Undo",
++                        $"{operationName} was saved, but it is too large to be undone.");
++                }
++            }
++            finally
++            {
++                // Marked finished whatever happened, including on the way out of an exception, so
++                // a scope that failed to record cannot be committed again.
++                finished = true;
++                pending.Clear();
++            }
++        }
++
++        public void Dispose()
++        {
++            // Not committed means the operation threw or was abandoned, so nothing is recorded.
++            // Nothing outside this scope was touched, so there is nothing else to put back.
++            finished = true;
++            pending.Clear();
++        }
++
++        private async Task<FeatureChange?> BuildChangeAsync(Pending item)
++        {
++            switch (item.Kind)
++            {
++                case FeatureChangeKind.Delete:
++                    return FeatureChange.Delete(item.Before!);
++
++                case FeatureChangeKind.Insert:
++                {
++                    // The row exists now, so read it back rather than trusting the object held in
++                    // memory. That is also how the id assigned by the service is picked up.
++                    var after = await snapshotFactory.CreateAsync(item.LayerName, item.Feature);
++                    return FeatureChange.Insert(after);
++                }
++
++                case FeatureChangeKind.Update:
++                {
++                    var live = await stateReader.ReadAsync(item.Before!.Identity);
++
++                    if (live is null)
++                    {
++                        loggerService.Warn(
++                            $"Edit history: '{operationName}' updated a row in {item.LayerName} that could not be read back, so it is not recorded.");
++                        return null;
++                    }
++
++                    return FeatureChange.Update(item.Before, live);
++                }
++
++                default:
++                    return null;
++            }
++        }
++    }
++
++    private sealed record Pending(
++        FeatureChangeKind Kind,
++        string LayerName,
++        Feature Feature,
++        FeatureSnapshot? Before);
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditSelectionClearer.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditSelectionClearer.cs
+new file mode 100644
+index 0000000..f81bce2
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditSelectionClearer.cs
+@@ -0,0 +1,9 @@
++using WG.MiEditor.Shared.AutoScanning;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IEditSelectionClearer) })]
++public sealed class EditSelectionClearer(IFeatureLayerService featureLayerService) : IEditSelectionClearer
++{
++    public Task ClearAsync() => featureLayerService.ClearAllSelections();
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChange.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChange.cs
+new file mode 100644
+index 0000000..b561b6d
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChange.cs
+@@ -0,0 +1,81 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// One primitive row delta. Every committed operation is recorded as an ordered list of
++/// these, which is what lets a single generic applier reverse merge, split, delete and the
++/// multi table creates without an inverse handler per operation family.
++/// <para>
++/// Which snapshots a change carries is fixed by its kind: an insert has only an after, a
++/// delete has only a before, an update has both. That pairing is checked on construction,
++/// so a change that reaches any other code is known to be well formed and Reference,
++/// Identity and Inverse can rely on it.
++/// </para>
++/// </summary>
++public sealed record FeatureChange(
++    FeatureChangeKind Kind,
++    FeatureSnapshot? Before,
++    FeatureSnapshot? After)
++{
++    // A field initialiser runs inside the primary constructor, so this validates every
++    // direct construction. Build changes through the factories below rather than with a
++    // with expression, which copies fields and would not re-run this.
++    private readonly bool wellFormed = Validate(Kind, Before, After);
++
++    public static FeatureChange Insert(FeatureSnapshot after) => new(FeatureChangeKind.Insert, null, after);
++
++    public static FeatureChange Update(FeatureSnapshot before, FeatureSnapshot after) =>
++        new(FeatureChangeKind.Update, before, after);
++
++    public static FeatureChange Delete(FeatureSnapshot before) => new(FeatureChangeKind.Delete, before, null);
++
++    /// <summary>
++    /// The snapshot describing the row as it should exist after this change was applied, or
++    /// the pre-edit snapshot for a delete, which is the only thing left to identify it by.
++    /// </summary>
++    public FeatureSnapshot Reference => After ?? Before!;
++
++    public FeatureIdentity Identity => Reference.Identity;
++
++    /// <summary>
++    /// The compensating change. An insert is undone by deleting, a delete by inserting the
++    /// captured row, and an update by writing the previous state back.
++    /// </summary>
++    public FeatureChange Inverse() => Kind switch
++    {
++        FeatureChangeKind.Insert => Delete(After!),
++        FeatureChangeKind.Delete => Insert(Before!),
++        FeatureChangeKind.Update => Update(After!, Before!),
++        _ => throw new InvalidOperationException($"Unsupported change kind: {Kind}.")
++    };
++
++    /// <summary>
++    /// The same change with its snapshots replaced, used when an object id is rewritten.
++    /// Routed through the factories so the result is validated like any other change.
++    /// </summary>
++    public FeatureChange WithSnapshots(FeatureSnapshot? before, FeatureSnapshot? after) => Kind switch
++    {
++        FeatureChangeKind.Insert => Insert(after!),
++        FeatureChangeKind.Delete => Delete(before!),
++        FeatureChangeKind.Update => Update(before!, after!),
++        _ => throw new InvalidOperationException($"Unsupported change kind: {Kind}.")
++    };
++
++    public long ApproximateSizeInBytes() =>
++        (Before?.ApproximateSizeInBytes() ?? 0) + (After?.ApproximateSizeInBytes() ?? 0);
++
++    private static bool Validate(FeatureChangeKind kind, FeatureSnapshot? before, FeatureSnapshot? after)
++    {
++        var ok = kind switch
++        {
++            FeatureChangeKind.Insert => before is null && after is not null,
++            FeatureChangeKind.Delete => before is not null && after is null,
++            FeatureChangeKind.Update => before is not null && after is not null,
++            _ => false
++        };
++
++        return ok
++            ? true
++            : throw new ArgumentException(
++                $"A {kind} change carries the wrong snapshots. Insert needs an after, delete needs a before, update needs both.");
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChangeApplier.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChangeApplier.cs
+new file mode 100644
+index 0000000..4c48c69
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChangeApplier.cs
+@@ -0,0 +1,246 @@
++using Esri.ArcGISRuntime.Data;
++using Esri.ArcGISRuntime.Geometry;
++using Esri.ArcGISRuntime.Mapping;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Logging.Utility.Abstraction;
++using WG.MiEditor.Shared.AutoScanning;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Writes row changes back to the feature tables.
++/// <para>
++/// All the local edits are made first and each touched table is then sent once, mirroring what
++/// the forward operations do. Unlike them, the result of every send is inspected: a service
++/// that rejects an edit reports it there rather than throwing, and an undo that silently
++/// half succeeded would leave the journal describing a state the data is not in.
++/// </para>
++/// <para>
++/// Inserting a row returns a new object id, because the service will not reuse the old one.
++/// Those are reported back so the journal can rewrite what it holds.
++/// </para>
++/// </summary>
++[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IFeatureChangeApplier) })]
++public sealed class FeatureChangeApplier(
++    IFeatureLayerService featureLayerService,
++    IFeatureSnapshotFactory snapshotFactory,
++    INetWorkAndIdentityChecker networkChecker,
++    ILoggerService loggerService) : IFeatureChangeApplier
++{
++    private const string ObjectIdAttribute = "OBJECTID";
++
++    public async Task<ChangeApplyResult> ApplyAsync(IReadOnlyList<FeatureChange> changes)
++    {
++        ArgumentNullException.ThrowIfNull(changes);
++
++        if (changes.Count == 0)
++        {
++            return ChangeApplyResult.Applied([]);
++        }
++
++        // The layer rather than the table, because finding an existing row needs the layer too
++        // and resolving it twice per change is a wasted round trip.
++        var touched = new Dictionary<string, FeatureLayer>(StringComparer.OrdinalIgnoreCase);
++        var inserted = new List<PendingInsert>();
++
++        try
++        {
++            foreach (var change in changes)
++            {
++                var layerName = change.Identity.LayerName;
++                var layer = await ResolveLayerAsync(layerName, touched);
++
++                if (layer?.FeatureTable is null)
++                {
++                    return ChangeApplyResult.Failed($"Layer '{layerName}' was not found.");
++                }
++
++                await ApplyOneAsync(change, layer, inserted);
++            }
++
++            foreach (var pair in touched)
++            {
++                var error = await SendAsync(pair.Key, pair.Value.FeatureTable!);
++
++                if (error is not null)
++                {
++                    return ChangeApplyResult.Failed(error);
++                }
++            }
++
++            // Only now does an inserted row have an object id, so the remaps are resolved here
++            // rather than at the point of insertion.
++            var remaps = inserted
++                .Select(i => new ObjectIdRemap(i.LayerName, i.OldObjectId, ReadObjectId(i.Feature)))
++                .Where(r => r.NewObjectId != 0 && r.NewObjectId != r.OldObjectId)
++                .ToList();
++
++            return ChangeApplyResult.Applied(remaps);
++        }
++        catch (Exception ex)
++        {
++            loggerService.Error(ex, $"Edit history: applying changes failed. {ex.Message}");
++            return ChangeApplyResult.Failed(ex.Message);
++        }
++    }
++
++    private async Task<FeatureLayer?> ResolveLayerAsync(string layerName, Dictionary<string, FeatureLayer> touched)
++    {
++        if (touched.TryGetValue(layerName, out var known))
++        {
++            return known;
++        }
++
++        var featureLayer = await featureLayerService.GetFeatureLayerAsync(layerName);
++
++        if (featureLayer?.FeatureTable is not null)
++        {
++            touched[layerName] = featureLayer;
++        }
++
++        return featureLayer;
++    }
++
++    private async Task ApplyOneAsync(FeatureChange change, FeatureLayer layer, List<PendingInsert> inserted)
++    {
++        switch (change.Kind)
++        {
++            case FeatureChangeKind.Insert:
++                inserted.Add(await InsertAsync(change, layer));
++                break;
++
++            case FeatureChangeKind.Delete:
++                await DeleteAsync(change, layer);
++                break;
++
++            case FeatureChangeKind.Update:
++                await UpdateAsync(change, layer);
++                break;
++
++            default:
++                throw new InvalidOperationException($"Unsupported change kind: {change.Kind}.");
++        }
++    }
++
++    private async Task<PendingInsert> InsertAsync(FeatureChange change, FeatureLayer layer)
++    {
++        var table = layer.FeatureTable!;
++        var snapshot = change.After!;
++        var feature = table.CreateFeature();
++
++        if (snapshot.GeometryJson is not null)
++        {
++            feature.Geometry = Geometry.FromJson(snapshot.GeometryJson);
++        }
++
++        foreach (var pair in snapshotFactory.WritableAttributes(snapshot))
++        {
++            if (table.Fields.Any(f => f.Name.Equals(pair.Key, StringComparison.OrdinalIgnoreCase)))
++            {
++                feature.SetAttributeValue(pair.Key, pair.Value);
++            }
++        }
++
++        await table.AddFeatureAsync(feature);
++
++        return new PendingInsert(layer.Name, snapshot.Identity.ObjectId, feature);
++    }
++
++    private async Task DeleteAsync(FeatureChange change, FeatureLayer layer)
++    {
++        var snapshot = change.Before!;
++        var existing = await FindAsync(layer, snapshot.Identity);
++
++        if (existing is null)
++        {
++            loggerService.Warn(
++                $"Edit history: nothing to delete for {layer.Name} {Describe(snapshot.Identity)}, so the change is treated as already applied.");
++            return;
++        }
++
++        await layer.FeatureTable!.DeleteFeatureAsync(existing);
++    }
++
++    private async Task UpdateAsync(FeatureChange change, FeatureLayer layer)
++    {
++        var snapshot = change.After!;
++        var existing = await FindAsync(layer, snapshot.Identity);
++
++        if (existing is null)
++        {
++            throw new InvalidOperationException(
++                $"Cannot update {layer.Name} {Describe(snapshot.Identity)} because it no longer exists.");
++        }
++
++        if (snapshot.GeometryJson is not null)
++        {
++            existing.Geometry = Geometry.FromJson(snapshot.GeometryJson);
++        }
++
++        foreach (var pair in snapshotFactory.WritableAttributes(snapshot))
++        {
++            if (existing.Attributes.ContainsKey(pair.Key))
++            {
++                existing.SetAttributeValue(pair.Key, pair.Value);
++            }
++        }
++
++        await layer.FeatureTable!.UpdateFeatureAsync(existing);
++    }
++
++    private async Task<ArcGISFeature?> FindAsync(FeatureLayer layer, FeatureIdentity identity)
++    {
++        var where = identity.HasBusinessKey
++            ? $"{identity.BusinessKeyField} = {Literal(identity.BusinessKeyValue!)}"
++            : $"{ObjectIdAttribute} = {identity.ObjectId}";
++
++        return await featureLayerService.GetArcGISFeatureAsync(layer, new QueryParameters { WhereClause = where });
++    }
++
++    /// <summary>
++    /// Sends one table and reports anything the service rejected. The forward operations mostly
++    /// ignore this result; an undo cannot afford to, because a rejected edit means the history
++    /// and the data have diverged.
++    /// </summary>
++    private async Task<string?> SendAsync(string layerName, FeatureTable table)
++    {
++        if (table is not ServiceFeatureTable serviceTable || !networkChecker.IsConnected)
++        {
++            // Offline, the edit stays in the local geodatabase and is reconciled on sync, which
++            // is exactly what the forward operations do.
++            return null;
++        }
++
++        var results = await serviceTable.ApplyEditsAsync();
++        var rejected = results?.FirstOrDefault(r => r.CompletedWithErrors);
++
++        if (rejected is null)
++        {
++            return null;
++        }
++
++        var message = rejected.Error?.Message ?? "the service rejected the edit without saying why";
++        loggerService.Error(rejected.Error ?? new InvalidOperationException(message),
++            $"Edit history: applying changes to '{layerName}' was rejected. {message}");
++
++        return $"{layerName}: {message}";
++    }
++
++    /// <summary>One inserted row, held until the table is sent and its id is known.</summary>
++    private sealed record PendingInsert(string LayerName, long OldObjectId, Feature Feature);
++
++    private static long ReadObjectId(Feature feature) =>
++        feature.Attributes.TryGetValue(ObjectIdAttribute, out var value) && value is not null
++            ? Convert.ToInt64(value)
++            : 0;
++
++    private static string Describe(FeatureIdentity identity) =>
++        identity.HasBusinessKey
++            ? $"{identity.BusinessKeyField} {identity.BusinessKeyValue}"
++            : $"{ObjectIdAttribute} {identity.ObjectId}";
++
++    private static string Literal(string value) =>
++        long.TryParse(value, out var number)
++            ? number.ToString()
++            : $"'{value.Replace("'", "''")}'";
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChangeKind.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChangeKind.cs
+new file mode 100644
+index 0000000..2149981
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureChangeKind.cs
+@@ -0,0 +1,8 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++public enum FeatureChangeKind
++{
++    Insert,
++    Update,
++    Delete
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentity.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentity.cs
+new file mode 100644
+index 0000000..d3d877c
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentity.cs
+@@ -0,0 +1,36 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Identifies a single row for the edit history. The business key is preferred over the
++/// object id because a feature re-created by an inverse insert is assigned a new object
++/// id by the service, whereas the business key is carried across on the attribute copy.
++/// </summary>
++public sealed record FeatureIdentity(
++    string LayerName,
++    long ObjectId,
++    string? BusinessKeyField = null,
++    string? BusinessKeyValue = null)
++{
++    public bool HasBusinessKey =>
++        !string.IsNullOrWhiteSpace(BusinessKeyField) && !string.IsNullOrWhiteSpace(BusinessKeyValue);
++
++    /// <summary>
++    /// Two identities refer to the same row when their business keys match, falling back to
++    /// the object id when either side has no business key.
++    /// </summary>
++    public bool SameRowAs(FeatureIdentity other)
++    {
++        if (!string.Equals(LayerName, other.LayerName, StringComparison.OrdinalIgnoreCase))
++        {
++            return false;
++        }
++
++        if (HasBusinessKey && other.HasBusinessKey)
++        {
++            return string.Equals(BusinessKeyField, other.BusinessKeyField, StringComparison.OrdinalIgnoreCase)
++                && string.Equals(BusinessKeyValue, other.BusinessKeyValue, StringComparison.OrdinalIgnoreCase);
++        }
++
++        return ObjectId == other.ObjectId;
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentityPolicy.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentityPolicy.cs
+new file mode 100644
+index 0000000..841d89d
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureIdentityPolicy.cs
+@@ -0,0 +1,28 @@
++using WG.MiEditor.Configuration.AppSettings;
++using WG.MiEditor.Shared.AutoScanning;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IFeatureIdentityPolicy) })]
++public sealed class FeatureIdentityPolicy(Layers layers) : IFeatureIdentityPolicy
++{
++    private const string PolygonId = "POLYGONID";
++    private const string LatestMod = "LATESTMOD";
++    private const string ModifiedDate = "MODIFIEDDT";
++
++    /// <summary>
++    /// Only the LPIS parcel layer has a single attribute that both identifies one row and
++    /// survives a delete and re-insert. The child layers carry POLYGONID or LPISPOLYID, but
++    /// those reference the parent parcel and repeat across many rows, so they cannot identify
++    /// a row on their own. Those layers return null and rely on object id remapping instead.
++    /// </summary>
++    public string? BusinessKeyField(string layerName) =>
++        Matches(layerName, layers.LPIS_Poly) ? PolygonId : null;
++
++    public string StampField(string layerName) =>
++        Matches(layerName, layers.LPIS_Poly) ? LatestMod : ModifiedDate;
++
++    private static bool Matches(string layerName, string? configured) =>
++        !string.IsNullOrWhiteSpace(configured)
++        && string.Equals(layerName, configured, StringComparison.OrdinalIgnoreCase);
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshot.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshot.cs
+new file mode 100644
+index 0000000..a850892
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshot.cs
+@@ -0,0 +1,38 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// The state of one row at one moment. Geometry is held as Esri JSON so the snapshot stays
++/// free of runtime types and cannot be mutated by later edits to the live feature.
++/// </summary>
++public sealed record FeatureSnapshot(
++    FeatureIdentity Identity,
++    string? GeometryJson,
++    string? StampField,
++    DateTime? StampValue,
++    IReadOnlyDictionary<string, object?> Attributes)
++{
++    /// <summary>
++    /// Approximate memory cost, used by the journal to keep the whole history inside its
++    /// budget. Strings are measured directly rather than through ToString, which would
++    /// allocate a string per attribute purely to read its length. Non string values are
++    /// counted as a small fixed size, which is close enough to rank an entry against a
++    /// budget measured in tens of megabytes.
++    /// </summary>
++    public long ApproximateSizeInBytes()
++    {
++        long total = (GeometryJson?.Length ?? 0) * 2L;
++
++        foreach (var pair in Attributes)
++        {
++            total += pair.Key.Length * 2L;
++            total += pair.Value switch
++            {
++                null => 0,
++                string s => s.Length * 2L,
++                _ => 8L
++            };
++        }
++
++        return total;
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshotFactory.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshotFactory.cs
+new file mode 100644
+index 0000000..85cd805
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureSnapshotFactory.cs
+@@ -0,0 +1,95 @@
++using Esri.ArcGISRuntime;
++using Esri.ArcGISRuntime.Data;
++using Esri.ArcGISRuntime.Geometry;
++using WG.MiEditor.Shared.AutoScanning;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IFeatureSnapshotFactory) })]
++public sealed class FeatureSnapshotFactory(IFeatureIdentityPolicy identityPolicy) : IFeatureSnapshotFactory
++{
++    private const string ObjectIdAttribute = "OBJECTID";
++    private const string GlobalIdAttribute = "GLOBALID";
++    private const string ShapeAttribute = "SHAPE";
++    private const string ShapePrefix = "SHAPE_";
++
++    public async Task<FeatureSnapshot> CreateAsync(string layerName, Feature feature)
++    {
++        ArgumentNullException.ThrowIfNull(feature);
++
++        if (feature is ArcGISFeature arcGisFeature && arcGisFeature.LoadStatus != LoadStatus.Loaded)
++        {
++            await arcGisFeature.LoadAsync();
++        }
++
++        var attributes = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
++
++        foreach (var pair in feature.Attributes)
++        {
++            attributes[pair.Key] = pair.Value;
++        }
++
++        var stampField = identityPolicy.StampField(layerName);
++
++        return new FeatureSnapshot(
++            BuildIdentity(layerName, attributes),
++            feature.Geometry?.ToJson(),
++            stampField,
++            ReadStamp(attributes, stampField),
++            attributes);
++    }
++
++    public IReadOnlyDictionary<string, object?> WritableAttributes(FeatureSnapshot snapshot)
++    {
++        ArgumentNullException.ThrowIfNull(snapshot);
++
++        var writable = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
++
++        foreach (var pair in snapshot.Attributes)
++        {
++            if (IsServiceOwned(pair.Key))
++            {
++                continue;
++            }
++
++            writable[pair.Key] = pair.Value;
++        }
++
++        return writable;
++    }
++
++    /// <summary>
++    /// Mirrors the exclusions the split persistence already applies when it copies attributes
++    /// onto a new feature. The service owns these and rejects writes to them.
++    /// </summary>
++    private static bool IsServiceOwned(string fieldName) =>
++        fieldName.Equals(ObjectIdAttribute, StringComparison.OrdinalIgnoreCase)
++        || fieldName.Equals(GlobalIdAttribute, StringComparison.OrdinalIgnoreCase)
++        || fieldName.Equals(ShapeAttribute, StringComparison.OrdinalIgnoreCase)
++        || fieldName.StartsWith(ShapePrefix, StringComparison.OrdinalIgnoreCase);
++
++    private FeatureIdentity BuildIdentity(string layerName, IReadOnlyDictionary<string, object?> attributes)
++    {
++        var objectId = ReadLong(attributes, ObjectIdAttribute);
++        var businessKeyField = identityPolicy.BusinessKeyField(layerName);
++
++        if (businessKeyField is null
++            || !attributes.TryGetValue(businessKeyField, out var businessKeyValue)
++            || businessKeyValue is null)
++        {
++            return new FeatureIdentity(layerName, objectId);
++        }
++
++        return new FeatureIdentity(layerName, objectId, businessKeyField, businessKeyValue.ToString());
++    }
++
++    private static long ReadLong(IReadOnlyDictionary<string, object?> attributes, string field) =>
++        attributes.TryGetValue(field, out var value) && value is not null
++            ? Convert.ToInt64(value)
++            : 0;
++
++    private static DateTime? ReadStamp(IReadOnlyDictionary<string, object?> attributes, string field) =>
++        attributes.TryGetValue(field, out var value) && value is not null
++            ? Convert.ToDateTime(value)
++            : null;
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureStateReader.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureStateReader.cs
+new file mode 100644
+index 0000000..2fa646b
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/FeatureStateReader.cs
+@@ -0,0 +1,138 @@
++using Esri.ArcGISRuntime.Data;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Shared.AutoScanning;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IFeatureStateReader) })]
++public sealed class FeatureStateReader(
++    IFeatureLayerService featureLayerService,
++    IFeatureSnapshotFactory snapshotFactory,
++    ILoggerService loggerService) : IFeatureStateReader
++{
++    public async Task<FeatureSnapshot?> ReadAsync(FeatureIdentity identity)
++    {
++        ArgumentNullException.ThrowIfNull(identity);
++
++        var featureLayer = await featureLayerService.GetFeatureLayerAsync(identity.LayerName);
++
++        if (featureLayer is null)
++        {
++            loggerService.Warn($"Edit history: layer '{identity.LayerName}' was not found, so the row could not be read.");
++            return null;
++        }
++
++        var feature = await featureLayerService.GetArcGISFeatureAsync(
++            featureLayer,
++            new QueryParameters { WhereClause = WhereClauseFor(identity) });
++
++        return feature is null
++            ? null
++            : await snapshotFactory.CreateAsync(identity.LayerName, feature);
++    }
++
++    public async Task<IReadOnlyList<FeatureSnapshot>> ReadManyAsync(
++        string layerName,
++        IReadOnlyCollection<FeatureIdentity> identities)
++    {
++        ArgumentNullException.ThrowIfNull(identities);
++
++        if (identities.Count == 0)
++        {
++            return [];
++        }
++
++        // Checked before the layer is resolved. A malformed batch is a caller mistake, and
++        // validating after the lookup would report it as whichever failure the lookup hit first.
++        RequireOneKeyField(identities);
++
++        var featureLayer = await featureLayerService.GetFeatureLayerAsync(layerName)
++            ?? throw new InvalidOperationException(
++                $"Layer '{layerName}' was not found, so the rows the edit history recorded against it cannot be read.");
++
++        var features = await featureLayerService.GetQueryFeaturesAsync(
++            featureLayer,
++            new QueryParameters { WhereClause = WhereClauseFor(identities) });
++
++        if (features is null || features.Count == 0)
++        {
++            return [];
++        }
++
++        var snapshots = new List<FeatureSnapshot>(features.Count);
++
++        foreach (var feature in features)
++        {
++            snapshots.Add(await snapshotFactory.CreateAsync(layerName, feature));
++        }
++
++        return snapshots;
++    }
++
++    /// <summary>
++    /// A business key identifies the row across a delete and re-insert, so it is preferred.
++    /// Without one the object id is all there is, and it only holds until the row is
++    /// re-created, which is why the journal rewrites it when that happens.
++    /// </summary>
++    private static string WhereClauseFor(FeatureIdentity identity) =>
++        identity.HasBusinessKey
++            ? $"{identity.BusinessKeyField} = {Literal(identity.BusinessKeyValue!)}"
++            : $"OBJECTID = {identity.ObjectId}";
++
++    /// <summary>
++    /// A batch is queried with a single IN clause, which can only name one field, so every identity
++    /// in it has to agree on which field that is.
++    /// <para>
++    /// It is tempting to assume this follows from the layer, but it does not:
++    /// FeatureSnapshotFactory returns a keyless identity whenever the key attribute is null, so one
++    /// keyed layer can yield both kinds. Silently dropping the odd ones out of the clause would
++    /// leave them unqueried, and the caller would read that absence as somebody else having
++    /// deleted them.
++    /// </para>
++    /// </summary>
++    private static void RequireOneKeyField(IReadOnlyCollection<FeatureIdentity> identities)
++    {
++        var first = identities.First();
++
++        if (identities.Any(i => i.HasBusinessKey != first.HasBusinessKey))
++        {
++            throw new ArgumentException(
++                "A batch must be either all keyed or all keyless, because the two are queried on " +
++                "different fields. Group by HasBusinessKey before calling.",
++                nameof(identities));
++        }
++
++        if (first.HasBusinessKey
++            && identities.Any(i => !string.Equals(i.BusinessKeyField, first.BusinessKeyField, StringComparison.OrdinalIgnoreCase)))
++        {
++            throw new ArgumentException(
++                $"A batch must share one business key field, and this one names both " +
++                $"'{first.BusinessKeyField}' and others. Group by BusinessKeyField before calling.",
++                nameof(identities));
++        }
++    }
++
++    /// <summary>
++    /// One clause covering every identity asked for. Follows the IN clause pattern already used in
++    /// FeatureLayerService. Assumes RequireOneKeyField has already passed, so reading the field off
++    /// the first identity is safe.
++    /// </summary>
++    private static string WhereClauseFor(IReadOnlyCollection<FeatureIdentity> identities)
++    {
++        var first = identities.First();
++
++        if (!first.HasBusinessKey)
++        {
++            return $"OBJECTID IN ({string.Join(", ", identities.Select(i => i.ObjectId))})";
++        }
++
++        var keys = identities.Select(i => Literal(i.BusinessKeyValue!));
++
++        return $"{first.BusinessKeyField} IN ({string.Join(", ", keys)})";
++    }
++
++    private static string Literal(string value) =>
++        long.TryParse(value, out var number)
++            ? number.ToString()
++            : $"'{value.Replace("'", "''")}'";
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditConflictDetector.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditConflictDetector.cs
+new file mode 100644
+index 0000000..58c5a03
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditConflictDetector.cs
+@@ -0,0 +1,28 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++public enum EditHistoryDirection { Undo, Redo }
++
++/// <summary>
++/// The outcome of checking whether an operation can still be reversed. Conflicting names the
++/// rows that had moved on, so the journal can drop every entry that touches them rather than
++/// only the one in play.
++/// </summary>
++public sealed record ConflictResult(
++    bool HasConflict,
++    string Reason,
++    IReadOnlyList<FeatureIdentity> Conflicting)
++{
++    public static ConflictResult None { get; } = new(false, string.Empty, []);
++
++    public static ConflictResult Conflict(string reason, params FeatureIdentity[] conflicting) =>
++        new(true, reason, conflicting);
++}
++
++/// <summary>
++/// Compares the data as it stands now against what was recorded, so an undo cannot quietly
++/// overwrite somebody else's work.
++/// </summary>
++public interface IEditConflictDetector
++{
++    Task<ConflictResult> CheckAsync(EditOperationEntry entry, EditHistoryDirection direction);
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryJournal.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryJournal.cs
+new file mode 100644
+index 0000000..5516316
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryJournal.cs
+@@ -0,0 +1,51 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// The bounded undo and redo stacks. Holds no Esri types and performs no input or output, so
++/// the ordering, eviction and invalidation rules are unit testable on their own.
++/// Every member is safe to call from any thread.
++/// </summary>
++public interface IEditHistoryJournal
++{
++    bool CanUndo { get; }
++    bool CanRedo { get; }
++    int UndoDepth { get; }
++    int RedoDepth { get; }
++
++    /// <summary>
++    /// Records a new operation, evicting the oldest entries past the depth or size budget.
++    /// Redo is cleared either way, because an operation has happened and nothing on the redo
++    /// side can be reached from the new state. Returns false, leaving the undo side untouched,
++    /// when the operation on its own is larger than the whole budget and so cannot be held at
++    /// all. The caller is expected to tell the user that this one operation cannot be undone.
++    /// </summary>
++    bool Record(EditOperationEntry entry);
++
++    EditOperationEntry? PeekUndo();
++    EditOperationEntry? PeekRedo();
++
++    /// <summary>Moves the most recent entry from the undo stack to the redo stack.</summary>
++    EditOperationEntry? PopUndoToRedo();
++
++    /// <summary>Moves the most recent entry from the redo stack back to the undo stack.</summary>
++    EditOperationEntry? PopRedoToUndo();
++
++    /// <summary>Discards the most recent undo entry without offering it for redo.</summary>
++    EditOperationEntry? DiscardUndo();
++
++    /// <summary>Discards every redo entry.</summary>
++    void ClearRedo();
++
++    /// <summary>
++    /// Rewrites a stale object id across both stacks after an inverse insert was assigned a
++    /// new one by the service.
++    /// </summary>
++    void RemapObjectId(string layerName, long oldObjectId, long newObjectId);
++
++    /// <summary>Drops every entry in either stack that touches any of the given rows.</summary>
++    int DropEntriesReferencing(IReadOnlyCollection<FeatureIdentity> identities);
++
++    void Clear();
++
++    event EventHandler? Changed;
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryService.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryService.cs
+new file mode 100644
+index 0000000..8f94e37
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryService.cs
+@@ -0,0 +1,21 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// What the Undo and Redo buttons talk to. It owns the sequencing and the safety checks and
++/// keeps the journal, the conflict check and the applier behind it, so the toolbar knows
++/// nothing about how an operation is reversed.
++/// </summary>
++public interface IEditHistoryService
++{
++    bool CanUndo { get; }
++    bool CanRedo { get; }
++
++    Task UndoAsync();
++    Task RedoAsync();
++
++    /// <summary>
++    /// Forgets everything recorded. Called when the case changes, because history recorded
++    /// against one case must never be applied against another.
++    /// </summary>
++    void ClearHistory();
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditOperationRecorder.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditOperationRecorder.cs
+new file mode 100644
+index 0000000..22dac97
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditOperationRecorder.cs
+@@ -0,0 +1,51 @@
++using Esri.ArcGISRuntime.Data;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Opens a scope around one operation so the history can be written down. Obtained by the
++/// services that perform edits; they are otherwise unaware of the history.
++/// </summary>
++public interface IEditOperationRecorder
++{
++    /// <summary>
++    /// Begins watching an operation. The name is what the user is told was undone, so it should
++    /// read as the action they took.
++    /// <para>
++    /// Each call returns an independent scope, so one operation is one entry. A save that spans
++    /// several services and must record as a single entry should pass its scope down the call
++    /// chain; the recorder deliberately keeps no ambient state of its own.
++    /// </para>
++    /// </summary>
++    IEditOperationScope Begin(string operationName);
++}
++
++/// <summary>
++/// One operation being watched. Nothing is written to the journal unless CommitAsync runs, so an
++/// operation that throws or is cancelled leaves no trace. Committing twice records nothing the
++/// second time.
++/// </summary>
++public interface IEditOperationScope : IDisposable
++{
++    /// <summary>Notes that a row is about to be created. Its id is not known until it is sent.</summary>
++    void MarkInsert(string layerName, Feature feature);
++
++    /// <summary>Copies a row before it is changed, so the previous values can be written back.</summary>
++    Task CaptureUpdateBeforeAsync(string layerName, Feature feature);
++
++    /// <summary>Copies a row before it is deleted. Afterwards this is the only copy that exists.</summary>
++    Task CaptureDeleteAsync(string layerName, Feature feature);
++
++    /// <summary>
++    /// Records the operation. Reads every touched row back from its table, so the recorded state
++    /// and any later comparison are produced by the same code.
++    /// <para>
++    /// Nothing is returned, because there is nothing for a caller to do about the two ways this
++    /// falls short. An operation too large for the whole history budget is reported to the user by
++    /// the recorder, which is the only place that knows why; a scope already committed or disposed
++    /// is a caller mistake, and is logged. Handing back a flag only invited a second message on top
++    /// of the first.
++    /// </para>
++    /// </summary>
++    Task CommitAsync();
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditSelectionClearer.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditSelectionClearer.cs
+new file mode 100644
+index 0000000..b507513
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditSelectionClearer.cs
+@@ -0,0 +1,15 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Clears whatever is selected on the map after the history has changed a row.
++/// <para>
++/// A one method seam over IFeatureLayerService, which is otherwise a wide ArcGIS aware
++/// interface. The history needs one call from it, and depending on the whole thing would make
++/// the undo orchestration untestable for no benefit. It also states the dependency honestly:
++/// the history has no business knowing about layer collections.
++/// </para>
++/// </summary>
++public interface IEditSelectionClearer
++{
++    Task ClearAsync();
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureChangeApplier.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureChangeApplier.cs
+new file mode 100644
+index 0000000..3643a4d
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureChangeApplier.cs
+@@ -0,0 +1,24 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>An object id the service replaced, so the journal can rewrite what it holds.</summary>
++public sealed record ObjectIdRemap(string LayerName, long OldObjectId, long NewObjectId);
++
++public sealed record ChangeApplyResult(
++    bool Success,
++    IReadOnlyList<ObjectIdRemap> Remaps,
++    string? Error)
++{
++    public static ChangeApplyResult Applied(IReadOnlyList<ObjectIdRemap> remaps) => new(true, remaps, null);
++
++    public static ChangeApplyResult Failed(string error) => new(false, [], error);
++}
++
++/// <summary>
++/// Writes a list of row changes to the feature tables. Used for the inverse of an operation on
++/// undo and for the operation itself on redo, which is the same code either way because a
++/// change already knows how to invert itself.
++/// </summary>
++public interface IFeatureChangeApplier
++{
++    Task<ChangeApplyResult> ApplyAsync(IReadOnlyList<FeatureChange> changes);
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureIdentityPolicy.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureIdentityPolicy.cs
+new file mode 100644
+index 0000000..225e007
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureIdentityPolicy.cs
+@@ -0,0 +1,15 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Resolves the per layer fields the history depends on. Both differ by layer: LPIS parcels
++/// carry a POLYGONID business key and stamp LATESTMOD, while the other editable layers have
++/// no business key of their own and stamp MODIFIEDDT.
++/// </summary>
++public interface IFeatureIdentityPolicy
++{
++    /// <summary>The attribute that survives a delete and re-insert, or null when there is none.</summary>
++    string? BusinessKeyField(string layerName);
++
++    /// <summary>The attribute written on every edit, used to detect a third party change.</summary>
++    string StampField(string layerName);
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureSnapshotFactory.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureSnapshotFactory.cs
+new file mode 100644
+index 0000000..d53f90e
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureSnapshotFactory.cs
+@@ -0,0 +1,21 @@
++using Esri.ArcGISRuntime.Data;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Converts between a live ArcGIS feature and the stored copy the history keeps. This and
++/// FeatureChangeApplier are the only types in the history that touch ArcGIS objects, which is
++/// what keeps the journal, the entries and the identity rules testable on their own.
++/// </summary>
++public interface IFeatureSnapshotFactory
++{
++    /// <summary>Copies a feature into a snapshot, loading it first if it is not loaded.</summary>
++    Task<FeatureSnapshot> CreateAsync(string layerName, Feature feature);
++
++    /// <summary>
++    /// The attributes from a snapshot that may be written back to a table. The object id and
++    /// the global id are left out, because the service assigns both and refuses writes to
++    /// them, as does anything shape derived.
++    /// </summary>
++    IReadOnlyDictionary<string, object?> WritableAttributes(FeatureSnapshot snapshot);
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureStateReader.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureStateReader.cs
+new file mode 100644
+index 0000000..6396a6c
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IFeatureStateReader.cs
+@@ -0,0 +1,33 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Reads a row's current state so the conflict check has something to compare against, and so
++/// a freshly written row can be recorded from the table rather than from the object held in
++/// memory. Both sides of any later comparison then come from the same code.
++/// </summary>
++public interface IFeatureStateReader
++{
++    /// <summary>
++    /// The row as it stands now, or null when it no longer exists. Resolved by business key
++    /// where the layer has one, otherwise by object id.
++    /// </summary>
++    Task<FeatureSnapshot?> ReadAsync(FeatureIdentity identity);
++
++    /// <summary>
++    /// The rows that still exist, out of those asked for, in one query per layer. Rows that have
++    /// been deleted are simply absent from the result.
++    /// <para>
++    /// Every identity passed must be on the same layer and agree on which field identifies it,
++    /// because they are fetched with one IN clause and it can only name one field. Group by layer
++    /// and by HasBusinessKey first. Throws when a batch disagrees, rather than querying part of it.
++    /// </para>
++    /// <para>
++    /// Throws when the layer cannot be resolved. An absent row and an absent layer look the same in
++    /// an empty result, and the caller would report the second as somebody else having deleted the
++    /// data. ReadAsync returns null for either, because its caller wants to skip rather than fail.
++    /// </para>
++    /// </summary>
++    Task<IReadOnlyList<FeatureSnapshot>> ReadManyAsync(
++        string layerName,
++        IReadOnlyCollection<FeatureIdentity> identities);
++}
+diff --git a/Src/MiEditor.MainApp/AutoScanning.cs b/Src/MiEditor.MainApp/AutoScanning.cs
+index 557ddac..0075b45 100644
+--- a/Src/MiEditor.MainApp/AutoScanning.cs
++++ b/Src/MiEditor.MainApp/AutoScanning.cs
+@@ -8,6 +8,7 @@ using WG.MiEditor.Configuration.AppSettings;
+ using WG.MiEditor.Core.Services;
+ using WG.MiEditor.Core.Services.Drawing.Editing;
+ using WG.MiEditor.Core.Services.Drawing.Editing.AddFeatures.Manager;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.Core.Services.Drawing.Editing.Managers;
+ using WG.MiEditor.Core.Services.Drawing.Editing.MergeFeature.Operation;
+ using WG.MiEditor.Core.Services.Drawing.Measurement.Manager;
+@@ -106,7 +107,8 @@ public static class AutoScanning
+         services.AddSingleton(sp => new ToolbarControlViewModel(
+             sp.GetRequiredService<IMessenger>(),
+             sp.GetRequiredService<IToolActivationCoordinator>(),
+-            sp.GetRequiredService<IToolDescriptorRegistry>()));
++            sp.GetRequiredService<IToolDescriptorRegistry>(),
++            sp.GetRequiredService<IEditHistoryService>()));
+ 
+         services.AddSingleton(sp => new EditingLayerToolbarViewModel(
+             sp.GetRequiredService<IMessenger>(),
+diff --git a/Src/MiEditor.MainApp/MauiProgram.cs b/Src/MiEditor.MainApp/MauiProgram.cs
+index f07fa74..c2ae341 100644
+--- a/Src/MiEditor.MainApp/MauiProgram.cs
++++ b/Src/MiEditor.MainApp/MauiProgram.cs
+@@ -55,6 +55,7 @@ public static class MauiProgram
+         builder.Services.AddSingleton(sp => sp.GetRequiredService<ApplicationSettings>().Layers);
+         builder.Services.AddSingleton(sp => sp.GetRequiredService<ApplicationSettings>().OfflineDataSettings);
+         builder.Services.AddSingleton(sp => sp.GetRequiredService<ApplicationSettings>().Logging);
++        builder.Services.AddSingleton(sp => sp.GetRequiredService<ApplicationSettings>().EditHistory);
+ 
+         builder.Services.AddOptions<ApplicationSettings>();
+         builder.Services.AddServicesByConvention();
+diff --git a/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/RedoToolDescriptor.cs b/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/RedoToolDescriptor.cs
+new file mode 100644
+index 0000000..6dcf887
+--- /dev/null
++++ b/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/RedoToolDescriptor.cs
+@@ -0,0 +1,20 @@
++using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Models.Toolbar;
++
++namespace WG.MiEditor.MainApp.ViewModels.Toolbar.Descriptors.StandardTools;
++
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IToolDescriptor) })]
++public sealed class RedoToolDescriptor : IToolDescriptor
++{
++    public ToolbarId ToolbarId => ToolbarId.Standard;
++
++    // Placeholder, as with UndoToolDescriptor. Replace with redo.png when it lands.
++    public string Icon => "next_extent.png";
++
++    public string Tooltip => "Redo";
++    public int Order => 7;
++    public GeometryScopes Geometries => GeometryScopes.All;
++    public string? Group => null;
++    public ToolActivation Activation => ToolActivation.Action;
++    public ITool Tool => StandardTool.Redo;
++}
+diff --git a/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/UndoToolDescriptor.cs b/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/UndoToolDescriptor.cs
+new file mode 100644
+index 0000000..f8dad2c
+--- /dev/null
++++ b/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/UndoToolDescriptor.cs
+@@ -0,0 +1,21 @@
++using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Models.Toolbar;
++
++namespace WG.MiEditor.MainApp.ViewModels.Toolbar.Descriptors.StandardTools;
++
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IToolDescriptor) })]
++public sealed class UndoToolDescriptor : IToolDescriptor
++{
++    public ToolbarId ToolbarId => ToolbarId.Standard;
++
++    // Placeholder. There is no undo artwork yet, so this borrows the back arrow the previous
++    // view button uses. Replace with undo.png when the real icon lands; nothing else changes.
++    public string Icon => "previous_extent.png";
++
++    public string Tooltip => "Undo";
++    public int Order => 6;
++    public GeometryScopes Geometries => GeometryScopes.All;
++    public string? Group => null;
++    public ToolActivation Activation => ToolActivation.Action;
++    public ITool Tool => StandardTool.Undo;
++}
+diff --git a/Src/MiEditor.MainApp/ViewModels/Toolbar/ToolbarControlViewModel.cs b/Src/MiEditor.MainApp/ViewModels/Toolbar/ToolbarControlViewModel.cs
+index 25c74d2..6a8dc63 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Toolbar/ToolbarControlViewModel.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Toolbar/ToolbarControlViewModel.cs
+@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Messaging;
+ using System.Collections.ObjectModel;
+ using WG.MiEditor.Enums;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar.Activation;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar.Descriptors;
+ using WG.MiEditor.Messages;
+ using WG.MiEditor.Shared.Messages.Map;
+@@ -16,15 +17,19 @@ namespace WG.MiEditor.MainApp.ViewModels.Toolbar;
+ // Registered as a singleton in AddToolbars (it needs the coordinator and registry), so
+ // no [RegisterService] attribute here, which would double-register it.
+ public partial class ToolbarControlViewModel : ObservableRecipient,
+-    IRecipient<MapViewNavigationButtonsEnabledMessage>
++    IRecipient<MapViewNavigationButtonsEnabledMessage>,
++    IRecipient<EditHistoryChangedMessage>
+ {
+     private readonly ToolActivationController<StandardTool> controller;
++    private readonly IEditHistoryService editHistory;
+ 
+     public ToolbarControlViewModel(
+         IMessenger messenger,
+         IToolActivationCoordinator coordinator,
+-        IToolDescriptorRegistry registry) : base(messenger)
++        IToolDescriptorRegistry registry,
++        IEditHistoryService editHistory) : base(messenger)
+     {
++        this.editHistory = editHistory;
+         controller = new ToolActivationController<StandardTool>(coordinator, OnActivate, OnDeactivate);
+         BuildTools(registry);
+ 
+@@ -41,7 +46,13 @@ public partial class ToolbarControlViewModel : ObservableRecipient,
+         foreach (var descriptor in registry.GetTools(ToolbarId.Standard))
+         {
+             var tool = (StandardTool)descriptor.Tool;
+-            var startsEnabled = tool != StandardTool.PreviousView && tool != StandardTool.NextView;
++            // The view history and the edit history both start empty, so their buttons start
++            // disabled and are enabled by the message each history sends.
++            var startsEnabled =
++                tool != StandardTool.PreviousView
++                && tool != StandardTool.NextView
++                && tool != StandardTool.Undo
++                && tool != StandardTool.Redo;
+ 
+             controller.Tools.Add(new IconButtonControlViewModel<StandardTool>(
+                 tool,
+@@ -60,9 +71,12 @@ public partial class ToolbarControlViewModel : ObservableRecipient,
+     // Cross-toolbar deactivation now runs through the coordinator, the StandardToolsInUseMessage
+     // broadcast is kept only for non-toolbar consumers (the information panel and the AOI control)
+     // that react to a standard tool being used.
+-    private Task OnActivate(StandardTool tool)
++    private async Task OnActivate(StandardTool tool)
+     {
+-        if (tool != StandardTool.PreviousView && tool != StandardTool.NextView)
++        if (tool != StandardTool.PreviousView
++            && tool != StandardTool.NextView
++            && tool != StandardTool.Undo
++            && tool != StandardTool.Redo)
+         {
+             Messenger.Send<StandardToolsInUseMessage>();
+         }
+@@ -91,8 +105,14 @@ public partial class ToolbarControlViewModel : ObservableRecipient,
+         {
+             Messenger.Send(new MapViewNavigationToolMessage(MapViewType.NextView));
+         }
+-
+-        return Task.CompletedTask;
++        else if (tool == StandardTool.Undo)
++        {
++            await editHistory.UndoAsync();
++        }
++        else if (tool == StandardTool.Redo)
++        {
++            await editHistory.RedoAsync();
++        }
+     }
+ 
+     private Task OnDeactivate()
+@@ -111,6 +131,12 @@ public partial class ToolbarControlViewModel : ObservableRecipient,
+         SetEnabled(StandardTool.NextView, message.IsNextEnabled);
+     }
+ 
++    public void Receive(EditHistoryChangedMessage message)
++    {
++        SetEnabled(StandardTool.Undo, message.CanUndo);
++        SetEnabled(StandardTool.Redo, message.CanRedo);
++    }
++
+     private void SetEnabled(StandardTool tool, bool isEnabled)
+     {
+         var button = Tools.FirstOrDefault(t => t.Tool == tool);
+diff --git a/Src/MiEditor.MainApp/appsettings.Dev.json b/Src/MiEditor.MainApp/appsettings.Dev.json
+index 9c82273..a4e58fb 100644
+--- a/Src/MiEditor.MainApp/appsettings.Dev.json
++++ b/Src/MiEditor.MainApp/appsettings.Dev.json
+@@ -212,6 +212,10 @@
+     "MapViewsInfo": {
+       "MaxViewsHistory": 10
+     },
++    "EditHistory": {
++      "MaxUndoDepth": 10,
++      "MaxTotalBytes": 67108864
++    },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+     "LpisPolyIdBufferDistanceMeters":-0.01
+diff --git a/Src/MiEditor.MainApp/appsettings.PP.json b/Src/MiEditor.MainApp/appsettings.PP.json
+index 88e1c99..58ba2d8 100644
+--- a/Src/MiEditor.MainApp/appsettings.PP.json
++++ b/Src/MiEditor.MainApp/appsettings.PP.json
+@@ -212,6 +212,10 @@
+     "MapViewsInfo": {
+       "MaxViewsHistory": 10
+     },
++    "EditHistory": {
++      "MaxUndoDepth": 10,
++      "MaxTotalBytes": 67108864
++    },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+     "LpisPolyIdBufferDistanceMeters":-0.01
+diff --git a/Src/MiEditor.MainApp/appsettings.Sys.json b/Src/MiEditor.MainApp/appsettings.Sys.json
+index 43be536..1acd1a3 100644
+--- a/Src/MiEditor.MainApp/appsettings.Sys.json
++++ b/Src/MiEditor.MainApp/appsettings.Sys.json
+@@ -212,6 +212,10 @@
+     "MapViewsInfo": {
+       "MaxViewsHistory": 10
+     },
++    "EditHistory": {
++      "MaxUndoDepth": 10,
++      "MaxTotalBytes": 67108864
++    },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+     "LpisPolyIdBufferDistanceMeters":-0.01
+diff --git a/Src/MiEditor.MainApp/appsettings.UAT.json b/Src/MiEditor.MainApp/appsettings.UAT.json
+index fb1b820..b1e50b6 100644
+--- a/Src/MiEditor.MainApp/appsettings.UAT.json
++++ b/Src/MiEditor.MainApp/appsettings.UAT.json
+@@ -212,6 +212,10 @@
+     "MapViewsInfo": {
+       "MaxViewsHistory": 10
+     },
++    "EditHistory": {
++      "MaxUndoDepth": 10,
++      "MaxTotalBytes": 67108864
++    },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+     "LpisPolyIdBufferDistanceMeters":-0.01
+diff --git a/Src/MiEditor.MainApp/appsettings.json b/Src/MiEditor.MainApp/appsettings.json
+index 593c2c9..ba4d9e4 100644
+--- a/Src/MiEditor.MainApp/appsettings.json
++++ b/Src/MiEditor.MainApp/appsettings.json
+@@ -212,6 +212,10 @@
+     "MapViewsInfo": {
+       "MaxViewsHistory": 10
+     },
++    "EditHistory": {
++      "MaxUndoDepth": 10,
++      "MaxTotalBytes": 67108864
++    },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+     "LpisPolyIdBufferDistanceMeters": -0.01
+diff --git a/Src/MiEditor.Shared/Configuration/AppSettings/ApplicationSettings.cs b/Src/MiEditor.Shared/Configuration/AppSettings/ApplicationSettings.cs
+index 0d3f07f..514e252 100644
+--- a/Src/MiEditor.Shared/Configuration/AppSettings/ApplicationSettings.cs
++++ b/Src/MiEditor.Shared/Configuration/AppSettings/ApplicationSettings.cs
+@@ -25,6 +25,10 @@ public record ApplicationSettings
+     public required AppVersionInfo AppVersionInfo { get; init; }
+     public required MaxUAreaConfig MaxUAreaConfig { get; init; }
+     public required MapViewsInfo MapViewsInfo { get; init; }
++
++    // Not required, and defaulted, so binaries carrying this can still read an appsettings
++    // file written before the edit history existed.
++    public EditHistoryInfo EditHistory { get; init; } = new();
+     public required double MinTaAreaInHectares { get; init; }
+     public required double CoordinateZoomScale { get; init; }
+     public required BufferSettings BufferSettings { get; init; }
+diff --git a/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs b/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs
+new file mode 100644
+index 0000000..a86afeb
+--- /dev/null
++++ b/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs
+@@ -0,0 +1,9 @@
++namespace WG.MiEditor.Configuration.AppSettings;
++
++/// <summary>
++/// Bounds the edit history. MaxUndoDepth is how many operations are kept.
++/// MaxTotalBytes bounds what the whole history may hold, across both the undo and the redo
++/// side, so a few very large operations cannot sit inside the depth cap and still consume
++/// an unbounded amount of memory. The oldest operations are evicted until the total fits.
++/// </summary>
++public record EditHistoryInfo(int MaxUndoDepth = 10, long MaxTotalBytes = 64L * 1024 * 1024);
+diff --git a/Src/MiEditor.Shared/Messages/Toolbar/EditHistoryMessages.cs b/Src/MiEditor.Shared/Messages/Toolbar/EditHistoryMessages.cs
+new file mode 100644
+index 0000000..d5428bb
+--- /dev/null
++++ b/Src/MiEditor.Shared/Messages/Toolbar/EditHistoryMessages.cs
+@@ -0,0 +1,7 @@
++namespace WG.MiEditor.Shared.Messages.Toolbar;
++
++/// <summary>
++/// Broadcast whenever the edit history changes, so the standard toolbar can enable or
++/// disable the undo and redo buttons. Mirrors how the map view navigation buttons are driven.
++/// </summary>
++public sealed record EditHistoryChangedMessage(bool CanUndo, bool CanRedo);
+diff --git a/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs b/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs
+index b1f8eb8..95c9181 100644
+--- a/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs
++++ b/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs
+@@ -13,6 +13,8 @@ public readonly struct StandardTool : ITool, IEquatable<StandardTool>
+     public static readonly StandardTool Refresh = new(nameof(Refresh));
+     public static readonly StandardTool PreviousView = new(nameof(PreviousView));
+     public static readonly StandardTool NextView = new( nameof(NextView));
++    public static readonly StandardTool Undo = new(nameof(Undo));
++    public static readonly StandardTool Redo = new(nameof(Redo));
+ 
+     public static readonly IEnumerable<StandardTool> All =
+     [
+@@ -21,7 +23,9 @@ public readonly struct StandardTool : ITool, IEquatable<StandardTool>
+         Info,
+         Refresh,
+         PreviousView,
+-        NextView
++        NextView,
++        Undo,
++        Redo
+     ];
+ 
+     public override string ToString() => Name;
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditConflictDetectorTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditConflictDetectorTests.cs
+new file mode 100644
+index 0000000..b284e99
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditConflictDetectorTests.cs
+@@ -0,0 +1,218 @@
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using static WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.EditHistoryTestData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++public class EditConflictDetectorTests
++{
++    private const string Child = "Canopy Point";
++
++    private readonly RecordingStateReader reader = new();
++    private readonly EditConflictDetector sut;
++
++    public EditConflictDetectorTests() => sut = new EditConflictDetector(reader);
++
++    // ---------------------------------------------------------------- how the rows are fetched
++
++    [Fact]
++    public async Task ManyRowsOnOneLayer_AreFetchedInOneQuery()
++    {
++        // The whole point of batching. Twenty rows must not cost twenty round trips.
++        var changes = Enumerable.Range(1, 20)
++            .Select(i => FeatureChange.Update(CreateSnapshot(i, $"{i}"), CreateSnapshot(i, $"{i}")))
++            .ToList();
++
++        await sut.CheckAsync(CreateEntry(changes: changes), EditHistoryDirection.Undo);
++
++        var batch = Assert.Single(reader.Batches);
++        Assert.Equal(20, batch.Identities.Count);
++    }
++
++    [Fact]
++    public async Task RowsOnDifferentLayers_AreFetchedSeparately()
++    {
++        await sut.CheckAsync(CreateEntry(changes:
++        [
++            FeatureChange.Update(CreateSnapshot(1, "100"), CreateSnapshot(1, "100")),
++            FeatureChange.Update(CreateSnapshot(9, layer: Child), CreateSnapshot(9, layer: Child)),
++        ]), EditHistoryDirection.Undo);
++
++        Assert.Equal(2, reader.Batches.Count);
++        Assert.Contains(reader.Batches, b => b.LayerName == Layer);
++        Assert.Contains(reader.Batches, b => b.LayerName == Child);
++    }
++
++    [Fact]
++    public async Task OneLayerYieldingBothKeyedAndKeylessRows_FetchesEachStrategySeparately()
++    {
++        // FeatureSnapshotFactory returns a keyless identity whenever the key attribute is null, so
++        // a keyed layer yields both kinds. An earlier version put them in one batch, the keyless
++        // ones were dropped from the IN clause, and they read back as deleted by somebody else.
++        await sut.CheckAsync(CreateEntry(changes:
++        [
++            FeatureChange.Update(CreateSnapshot(1, "100"), CreateSnapshot(1, "100")),
++            FeatureChange.Update(CreateSnapshot(2, businessKey: null), CreateSnapshot(2, businessKey: null)),
++        ]), EditHistoryDirection.Undo);
++
++        Assert.Equal(2, reader.Batches.Count);
++        Assert.All(reader.Batches, b =>
++            Assert.True(
++                b.Identities.All(i => i.HasBusinessKey) || b.Identities.All(i => !i.HasBusinessKey),
++                "Every batch has to be homogeneous, because the reader rejects a mixed one."));
++    }
++
++    [Fact]
++    public async Task EveryBatchSatisfiesWhatTheReaderDemandsOfIt()
++    {
++        // The reader throws on a batch that mixes strategies. This asserts the detector never
++        // hands it one, without the test having to know how the grouping is written.
++        reader.ValidateLikeTheRealReader = true;
++
++        await sut.CheckAsync(CreateEntry(changes:
++        [
++            FeatureChange.Update(CreateSnapshot(1, "100"), CreateSnapshot(1, "100")),
++            FeatureChange.Update(CreateSnapshot(2, businessKey: null), CreateSnapshot(2, businessKey: null)),
++            FeatureChange.Update(CreateSnapshot(3, layer: Child), CreateSnapshot(3, layer: Child)),
++        ]), EditHistoryDirection.Undo);
++
++        Assert.Equal(3, reader.Batches.Count);
++    }
++
++    [Fact]
++    public async Task ARowTouchedTwiceByOneOperation_IsOnlyFetchedOnce()
++    {
++        await sut.CheckAsync(CreateEntry(changes:
++        [
++            FeatureChange.Update(CreateSnapshot(1, "100"), CreateSnapshot(1, "100")),
++            FeatureChange.Update(CreateSnapshot(1, "100"), CreateSnapshot(1, "100")),
++        ]), EditHistoryDirection.Undo);
++
++        Assert.Single(Assert.Single(reader.Batches).Identities);
++    }
++
++    [Fact]
++    public async Task AnEntryWithNoChanges_DoesNotTouchTheServiceAtAll()
++    {
++        var result = await sut.CheckAsync(
++            EditOperationEntry.Create("Nothing", CaseKey, [], DateTime.UtcNow),
++            EditHistoryDirection.Undo);
++
++        Assert.False(result.HasConflict);
++        Assert.Empty(reader.Batches);
++    }
++
++    // ---------------------------------------------------------------- what counts as a conflict
++
++    [Fact]
++    public async Task AKeylessRowStillPresent_IsNotAConflict()
++    {
++        // The case the batching bug broke: a keyless row on a keyed layer, alive, undo allowed.
++        var snapshot = CreateSnapshot(2, businessKey: null);
++        reader.Live = [snapshot];
++
++        var result = await sut.CheckAsync(
++            CreateEntry(changes: [FeatureChange.Update(snapshot, snapshot)]),
++            EditHistoryDirection.Undo);
++
++        Assert.False(result.HasConflict);
++    }
++
++    [Fact]
++    public async Task ARowSomebodyElseDeleted_IsAConflict()
++    {
++        reader.Live = [];
++
++        var result = await sut.CheckAsync(CreateEntry(), EditHistoryDirection.Undo);
++
++        Assert.True(result.HasConflict);
++        Assert.Contains("deleted by someone else", result.Reason);
++    }
++
++    [Fact]
++    public async Task ARowSomebodyElseChanged_IsAConflict()
++    {
++        reader.Live = [CreateSnapshot(1, "100", stamp: new DateTime(2026, 1, 1))];
++
++        var result = await sut.CheckAsync(
++            CreateEntry(changes: [FeatureChange.Update(
++                CreateSnapshot(1, "100", stamp: new DateTime(2025, 1, 1)),
++                CreateSnapshot(1, "100", stamp: new DateTime(2025, 1, 1)))]),
++            EditHistoryDirection.Undo);
++
++        Assert.True(result.HasConflict);
++        Assert.Contains("changed by someone else", result.Reason);
++    }
++
++    [Fact]
++    public async Task ARowSomebodyElseRecreated_IsAConflictWhenUndoingADelete()
++    {
++        // Undoing a delete means putting the row back. If it is already back, somebody beat us.
++        reader.Live = [CreateSnapshot(1, "100")];
++
++        var result = await sut.CheckAsync(
++            CreateEntry(changes: [FeatureChange.Delete(CreateSnapshot(1, "100"))]),
++            EditHistoryDirection.Undo);
++
++        Assert.True(result.HasConflict);
++        Assert.Contains("created again by someone else", result.Reason);
++    }
++
++    [Fact]
++    public async Task GeometryWrittenDifferentlyButTheSameShape_IsNotAConflict()
++    {
++        // The service round trips coordinates, so text inequality alone must not read as an edit.
++        // With GeometryEngine stubbed this asserts that the detector consults the shape comparison
++        // rather than stopping at the string, not that the real comparison is correct.
++        reader.Live = [CreateSnapshot(1, "100", geometryJson: "{\"x\": 1.0, \"y\": 2.0}")];
++
++        var result = await sut.CheckAsync(
++            CreateEntry(changes: [FeatureChange.Update(
++                CreateSnapshot(1, "100", geometryJson: "{\"x\":1,\"y\":2}"),
++                CreateSnapshot(1, "100", geometryJson: "{\"x\":1,\"y\":2}"))]),
++            EditHistoryDirection.Undo);
++
++        Assert.False(result.HasConflict);
++    }
++
++    // ---------------------------------------------------------------- fake
++
++    private sealed record Batch(string LayerName, IReadOnlyCollection<FeatureIdentity> Identities);
++
++    private sealed class RecordingStateReader : IFeatureStateReader
++    {
++        public List<Batch> Batches { get; } = [];
++
++        /// <summary>Null means "every row asked for is still there, unchanged".</summary>
++        public List<FeatureSnapshot>? Live { get; set; }
++
++        /// <summary>Applies the real reader's precondition, so a bad batch fails the test.</summary>
++        public bool ValidateLikeTheRealReader { get; set; }
++
++        public Task<FeatureSnapshot?> ReadAsync(FeatureIdentity identity) =>
++            throw new NotSupportedException("The detector reads in batches.");
++
++        public Task<IReadOnlyList<FeatureSnapshot>> ReadManyAsync(
++            string layerName,
++            IReadOnlyCollection<FeatureIdentity> identities)
++        {
++            if (ValidateLikeTheRealReader)
++            {
++                var first = identities.First();
++
++                Assert.DoesNotContain(identities, i => i.HasBusinessKey != first.HasBusinessKey);
++                Assert.DoesNotContain(identities, i => !string.Equals(
++                    i.BusinessKeyField, first.BusinessKeyField, StringComparison.OrdinalIgnoreCase));
++                Assert.DoesNotContain(identities, i => !string.Equals(
++                    i.LayerName, layerName, StringComparison.OrdinalIgnoreCase));
++            }
++
++            Batches.Add(new Batch(layerName, identities));
++
++            IReadOnlyList<FeatureSnapshot> result = Live is not null
++                ? [.. Live.Where(s => identities.Any(i => i.SameRowAs(s.Identity)))]
++                : [.. identities.Select(i => CreateSnapshot(i.ObjectId, i.BusinessKeyValue, layer: i.LayerName))];
++
++            return Task.FromResult(result);
++        }
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryJournalTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryJournalTests.cs
+new file mode 100644
+index 0000000..db8ff1b
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryJournalTests.cs
+@@ -0,0 +1,355 @@
++using WG.MiEditor.Configuration.AppSettings;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using static WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.EditHistoryTestData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++public class EditHistoryJournalTests
++{
++    private readonly EditHistoryJournal sut = new(new EditHistoryInfo(MaxUndoDepth: 10));
++
++    [Fact]
++    public void NewJournal_OffersNeitherUndoNorRedo()
++    {
++        Assert.False(sut.CanUndo);
++        Assert.False(sut.CanRedo);
++        Assert.Equal(0, sut.UndoDepth);
++    }
++
++    [Fact]
++    public void Record_MakesTheOperationUndoable()
++    {
++        sut.Record(CreateEntry());
++
++        Assert.True(sut.CanUndo);
++        Assert.Equal(1, sut.UndoDepth);
++    }
++
++    [Fact]
++    public void Record_PastTheCap_EvictsTheOldestOperation()
++    {
++        var oldest = CreateEntry("Operation 0");
++        sut.Record(oldest);
++
++        for (var i = 1; i <= 10; i++)
++        {
++            sut.Record(CreateEntry($"Operation {i}"));
++        }
++
++        Assert.Equal(10, sut.UndoDepth);
++
++        var names = DrainUndoNames();
++        Assert.DoesNotContain("Operation 0", names);
++        Assert.Contains("Operation 10", names);
++    }
++
++    [Fact]
++    public void Record_ClearsTheRedoStack()
++    {
++        sut.Record(CreateEntry("first"));
++        sut.PopUndoToRedo();
++        Assert.True(sut.CanRedo);
++
++        sut.Record(CreateEntry("second"));
++
++        Assert.False(sut.CanRedo);
++        Assert.Equal(0, sut.RedoDepth);
++    }
++
++    [Theory]
++    [InlineData(1)]
++    [InlineData(5)]
++    [InlineData(10)]
++    public void CombinedDepth_NeverExceedsTheCap(int operations)
++    {
++        for (var i = 0; i < operations; i++)
++        {
++            sut.Record(CreateEntry($"Operation {i}"));
++        }
++
++        for (var i = 0; i < operations; i++)
++        {
++            sut.PopUndoToRedo();
++            Assert.True(sut.UndoDepth + sut.RedoDepth <= 10);
++        }
++
++        Assert.Equal(operations, sut.RedoDepth);
++        Assert.Equal(0, sut.UndoDepth);
++    }
++
++    [Fact]
++    public void PopUndoToRedo_ThenPopRedoToUndo_RestoresTheSameEntry()
++    {
++        var entry = CreateEntry("Merge");
++        sut.Record(entry);
++
++        var undone = sut.PopUndoToRedo();
++        var redone = sut.PopRedoToUndo();
++
++        Assert.Equal(entry.Id, undone!.Id);
++        Assert.Equal(entry.Id, redone!.Id);
++        Assert.Equal(1, sut.UndoDepth);
++        Assert.Equal(0, sut.RedoDepth);
++    }
++
++    [Fact]
++    public void PopUndoToRedo_OnAnEmptyJournal_ReturnsNull()
++    {
++        Assert.Null(sut.PopUndoToRedo());
++        Assert.Null(sut.PopRedoToUndo());
++    }
++
++    [Fact]
++    public void DiscardUndo_RemovesTheEntryWithoutOfferingItForRedo()
++    {
++        sut.Record(CreateEntry());
++
++        sut.DiscardUndo();
++
++        Assert.False(sut.CanUndo);
++        Assert.False(sut.CanRedo);
++    }
++
++    [Fact]
++    public void RemapObjectId_RewritesTheIdAcrossBothStacks()
++    {
++        sut.Record(CreateEntryTouching(42));
++        sut.PopUndoToRedo();
++        sut.Record(CreateEntryTouching(42));
++
++        sut.RemapObjectId(Layer, oldObjectId: 42, newObjectId: 77);
++
++        Assert.Equal(77, sut.PeekUndo()!.Changes[0].Identity.ObjectId);
++    }
++
++    [Fact]
++    public void RemapObjectId_LeavesOtherLayersAlone()
++    {
++        sut.Record(CreateEntry(changes: [FeatureChange.Update(
++            CreateSnapshot(42, layer: "Canopy_Point"),
++            CreateSnapshot(42, layer: "Canopy_Point"))]));
++
++        sut.RemapObjectId(Layer, oldObjectId: 42, newObjectId: 77);
++
++        Assert.Equal(42, sut.PeekUndo()!.Changes[0].Identity.ObjectId);
++    }
++
++    [Fact]
++    public void DropEntriesReferencing_SweepsBothStacks()
++    {
++        sut.Record(CreateEntryTouching(1, "100"));
++        sut.Record(CreateEntryTouching(2, "200"));
++        sut.PopUndoToRedo();
++
++        var dropped = sut.DropEntriesReferencing([CreateIdentity(2, "200")]);
++
++        Assert.Equal(1, dropped);
++        Assert.Equal(0, sut.RedoDepth);
++        Assert.Equal(1, sut.UndoDepth);
++    }
++
++    [Fact]
++    public void DropEntriesReferencing_MatchesOnBusinessKeyNotObjectId()
++    {
++        sut.Record(CreateEntryTouching(1, "100"));
++
++        var dropped = sut.DropEntriesReferencing([CreateIdentity(999, "100")]);
++
++        Assert.Equal(1, dropped);
++        Assert.Equal(0, sut.UndoDepth);
++    }
++
++    [Fact]
++    public void Clear_EmptiesBothStacks()
++    {
++        sut.Record(CreateEntry());
++        sut.PopUndoToRedo();
++        sut.Record(CreateEntry());
++
++        sut.Clear();
++
++        Assert.False(sut.CanUndo);
++        Assert.False(sut.CanRedo);
++    }
++
++    [Fact]
++    public void AnOperationLargerThanTheWholeBudget_IsRefusedAndLeavesTheHistoryIntact()
++    {
++        var journal = new EditHistoryJournal(new EditHistoryInfo(MaxUndoDepth: 10, MaxTotalBytes: 2000));
++        journal.Record(CreateEntry("Earlier work"));
++
++        var recorded = journal.Record(CreateEntry("Enormous", changes:
++            [FeatureChange.Insert(CreateSnapshot(1, "100", geometryJson: new string('x', 5000)))]));
++
++        Assert.False(recorded);
++        Assert.Equal(1, journal.UndoDepth);
++        Assert.True(journal.CanUndo);
++        Assert.Equal("Earlier work", journal.PeekUndo()!.OperationName);
++    }
++
++    [Fact]
++    public void ALargeOperationEvictsOlderOnesRatherThanBlockingUndo()
++    {
++        var large = CreateEntry("Large", changes:
++            [FeatureChange.Insert(CreateSnapshot(1, "100", geometryJson: new string('x', 2500)))]);
++
++        // Room for the large operation and a couple of small ones, but not for five as well,
++        // so recording the large one has to evict rather than refuse.
++        var budget = large.ApproximateSizeInBytes() + (CreateEntry().ApproximateSizeInBytes() * 2);
++        var journal = new EditHistoryJournal(new EditHistoryInfo(MaxUndoDepth: 10, MaxTotalBytes: budget));
++
++        for (var i = 0; i < 5; i++)
++        {
++            journal.Record(CreateEntry($"Small {i}"));
++        }
++
++        Assert.Equal(5, journal.UndoDepth);
++
++        var recorded = journal.Record(large);
++
++        Assert.True(recorded);
++        Assert.True(journal.CanUndo);
++        Assert.Equal("Large", journal.PeekUndo()!.OperationName);
++        Assert.True(journal.UndoDepth < 6);
++    }
++
++    [Fact]
++    public void Changed_IsRaisedOnEveryMutation()
++    {
++        var raised = 0;
++        sut.Changed += (_, _) => raised++;
++
++        sut.Record(CreateEntry());
++        sut.PopUndoToRedo();
++        sut.PopRedoToUndo();
++        sut.Clear();
++
++        Assert.Equal(4, raised);
++    }
++
++    [Fact]
++    public void Changed_IsNotRaisedWhenNothingActuallyChanges()
++    {
++        var raised = 0;
++        sut.Changed += (_, _) => raised++;
++
++        sut.Clear();
++        sut.ClearRedo();
++        sut.DropEntriesReferencing([]);
++
++        Assert.Equal(0, raised);
++    }
++
++    [Fact]
++    public void Constructor_RejectsANonPositiveDepth()
++    {
++        Assert.Throws<ArgumentOutOfRangeException>(() => new EditHistoryJournal(new EditHistoryInfo(MaxUndoDepth: 0)));
++    }
++
++    [Fact]
++    public void RowsOnAKeylessLayer_AreNotTreatedAsTheSameRow()
++    {
++        // Two canopy points in the same parcel. Without a business key they must be
++        // distinguished by object id, or dropping one would drop both.
++        sut.Record(CreateEntry(changes: [FeatureChange.Update(
++            CreateSnapshot(501, layer: "Canopy_Point"), CreateSnapshot(501, layer: "Canopy_Point"))]));
++        sut.Record(CreateEntry(changes: [FeatureChange.Update(
++            CreateSnapshot(502, layer: "Canopy_Point"), CreateSnapshot(502, layer: "Canopy_Point"))]));
++
++        var dropped = sut.DropEntriesReferencing([new FeatureIdentity("Canopy_Point", 502)]);
++
++        Assert.Equal(1, dropped);
++        Assert.Equal(1, sut.UndoDepth);
++    }
++
++    [Fact]
++    public void ClearRedo_EmptiesAPopulatedRedoStack()
++    {
++        sut.Record(CreateEntry());
++        sut.PopUndoToRedo();
++        Assert.Equal(1, sut.RedoDepth);
++
++        sut.ClearRedo();
++
++        Assert.Equal(0, sut.RedoDepth);
++        Assert.False(sut.CanRedo);
++    }
++
++    [Fact]
++    public void PeekRedo_ReturnsTheEntryThatRedoWouldReapply()
++    {
++        var entry = CreateEntry("Merge");
++        sut.Record(entry);
++        sut.PopUndoToRedo();
++
++        Assert.Equal(entry.Id, sut.PeekRedo()!.Id);
++        Assert.Equal(1, sut.RedoDepth);
++    }
++
++    [Fact]
++    public void Record_ReturnsTrueWhenTheOperationIsKept()
++    {
++        Assert.True(sut.Record(CreateEntry()));
++    }
++
++    [Fact]
++    public void AnOperationTooLargeToRecord_StillClearsRedo()
++    {
++        // An operation happened, so nothing on the redo side can be reached from the state the
++        // data is now in. Whether the operation was small enough to keep is a separate matter.
++        var journal = new EditHistoryJournal(new EditHistoryInfo(MaxUndoDepth: 10, MaxTotalBytes: 3000));
++        journal.Record(CreateEntry("Something"));
++        journal.PopUndoToRedo();
++        Assert.Equal(1, journal.RedoDepth);
++
++        var recorded = journal.Record(CreateEntry("Enormous", changes:
++            [FeatureChange.Insert(CreateSnapshot(1, "100", geometryJson: new string('x', 5000)))]));
++
++        Assert.False(recorded);
++        Assert.Equal(0, journal.RedoDepth);
++        Assert.False(journal.CanRedo);
++    }
++
++    [Fact]
++    public void AnOperationTooLargeToRecord_TellsListenersWhenItClearedRedo()
++    {
++        var journal = new EditHistoryJournal(new EditHistoryInfo(MaxUndoDepth: 10, MaxTotalBytes: 3000));
++        journal.Record(CreateEntry("Something"));
++        journal.PopUndoToRedo();
++
++        var raised = 0;
++        journal.Changed += (_, _) => raised++;
++
++        journal.Record(CreateEntry("Enormous", changes:
++            [FeatureChange.Insert(CreateSnapshot(1, "100", geometryJson: new string('x', 5000)))]));
++
++        Assert.Equal(1, raised);
++    }
++
++    [Fact]
++    public void AnOperationTooLargeToRecord_SaysNothingWhenThereWasNoRedoToClear()
++    {
++        var journal = new EditHistoryJournal(new EditHistoryInfo(MaxUndoDepth: 10, MaxTotalBytes: 3000));
++
++        var raised = 0;
++        journal.Changed += (_, _) => raised++;
++
++        var recorded = journal.Record(CreateEntry("Enormous", changes:
++            [FeatureChange.Insert(CreateSnapshot(1, "100", geometryJson: new string('x', 5000)))]));
++
++        Assert.False(recorded);
++        Assert.Equal(0, raised);
++    }
++
++    private List<string> DrainUndoNames()
++    {
++        var names = new List<string>();
++
++        while (sut.PeekUndo() is not null)
++        {
++            names.Add(sut.DiscardUndo()!.OperationName);
++        }
++
++        return names;
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryServiceTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryServiceTests.cs
+new file mode 100644
+index 0000000..c1e2aab
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryServiceTests.cs
+@@ -0,0 +1,318 @@
++using CommunityToolkit.Mvvm.Messaging;
++using Moq;
++using WG.MiEditor.Configuration.AppSettings;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using WG.MiEditor.Core.Services.Drawing.Editing.Managers;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Messages.CaseManagement;
++using WG.MiEditor.Shared.Messages.Map;
++using WG.MiEditor.Shared.Messages.Toolbar;
++using WG.MiEditor.Shared.Models.Toolbar;
++using WG.MiEditor.Tests.Common;
++using static WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.EditHistoryTestData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++public class EditHistoryServiceTests
++{
++    private const string OpenCase = CaseKey;
++    private const string PointLayer = "Canopy Point";
++
++    private readonly StrongReferenceMessenger messenger = new();
++    private readonly EditHistoryJournal journal = new(new EditHistoryInfo(MaxUndoDepth: 10));
++    private readonly FakeConflictDetector detector = new();
++    private readonly FakeApplier applier = new();
++    private readonly FakeEditingOperations editingOperations = new();
++    private readonly FakeSelectionClearer selectionClearer = new();
++    private readonly FakeOperationFeedbackService feedback = new() { ExecuteOperations = true };
++    private readonly FakeCaseContext caseContext = new() { CaseNo = OpenCase };
++
++    private readonly List<EditHistoryChangedMessage> published = [];
++    private readonly EditHistoryService sut;
++
++    public EditHistoryServiceTests()
++    {
++        sut = new EditHistoryService(
++            journal, detector, applier, editingOperations, selectionClearer,
++            feedback, caseContext, messenger, Mock.Of<ILoggerService>());
++
++        messenger.Register<EditHistoryChangedMessage>(this, (_, m) => published.Add(m));
++    }
++
++    // ---------------------------------------------------------------- availability
++
++    [Fact]
++    public void WithNothingRecorded_NeitherUndoNorRedoIsAvailable()
++    {
++        Assert.False(sut.CanUndo);
++        Assert.False(sut.CanRedo);
++    }
++
++    [Fact]
++    public void RecordingAnOperation_TellsTheToolbarWhatIsAvailable()
++    {
++        journal.Record(CreateEntry());
++
++        var message = Assert.Single(published);
++        Assert.True(message.CanUndo);
++        Assert.False(message.CanRedo);
++    }
++
++    [Fact]
++    public void ClearHistory_EmptiesTheJournalAndTellsTheToolbar()
++    {
++        journal.Record(CreateEntry());
++        published.Clear();
++
++        sut.ClearHistory();
++
++        Assert.Equal(0, journal.UndoDepth);
++        Assert.False(Assert.Single(published).CanUndo);
++    }
++
++    [Fact]
++    public void EveryCaseLifecycleMessage_ClearsTheHistory()
++    {
++        // Sent as their concrete types on purpose. The messenger dispatches on the static type of
++        // the argument, so sending these as object would reach nothing.
++        AssertClears(() => messenger.Send(new SelectedCaseMessage(null)));
++        AssertClears(() => messenger.Send(new SelectedCaseStartEditingMessage("Available")));
++        AssertClears(() => messenger.Send(new SelectedCaseStopEditingMessage()));
++        AssertClears(() => messenger.Send(new ExitCaseMessage()));
++
++        void AssertClears(Action send)
++        {
++            journal.Record(CreateEntry());
++            Assert.True(sut.CanUndo);
++
++            send();
++
++            Assert.False(sut.CanUndo);
++        }
++    }
++
++    // ---------------------------------------------------------------- undo, the happy path
++
++    [Fact]
++    public async Task Undo_AppliesTheOppositeOfWhatWasRecorded()
++    {
++        journal.Record(CreateEntry("Add Canopy Point",
++            [FeatureChange.Insert(CreateSnapshot(501, layer: PointLayer))]));
++
++        await sut.UndoAsync();
++
++        var change = Assert.Single(Assert.Single(applier.Applied));
++        Assert.Equal(FeatureChangeKind.Delete, change.Kind);
++        Assert.Equal(501, change.Identity.ObjectId);
++    }
++
++    [Fact]
++    public async Task Undo_StandsTheEditingToolsDownFirst()
++    {
++        // A vertex tool could be holding the very feature that is about to be deleted.
++        journal.Record(CreateEntry());
++
++        await sut.UndoAsync();
++
++        Assert.Equal(1, editingOperations.DeactivateCalls);
++    }
++
++    [Fact]
++    public async Task Undo_MovesTheEntryToTheRedoSide()
++    {
++        journal.Record(CreateEntry());
++
++        await sut.UndoAsync();
++
++        Assert.Equal(0, journal.UndoDepth);
++        Assert.Equal(1, journal.RedoDepth);
++        Assert.True(sut.CanRedo);
++    }
++
++    [Fact]
++    public async Task Undo_ClearsTheSelectionAndSaysWhatItUndid()
++    {
++        journal.Record(CreateEntry("Add Canopy Point"));
++
++        await sut.UndoAsync();
++
++        Assert.Equal(1, selectionClearer.Calls);
++        Assert.Contains(("Undo", "Undone: Add Canopy Point"), feedback.SuccessNotifications);
++    }
++
++    [Fact]
++    public async Task Undo_RewritesTheObjectIdTheServiceReplaced()
++    {
++        // A restored row gets a new id, and Canopy Point has no business key to fall back on, so
++        // the rewrite is the only thing keeping other entries pointing at the right row.
++        journal.Record(CreateEntry(changes:
++            [FeatureChange.Update(CreateSnapshot(501, layer: PointLayer), CreateSnapshot(501, layer: PointLayer))]));
++        journal.Record(CreateEntry(changes:
++            [FeatureChange.Delete(CreateSnapshot(501, layer: PointLayer))]));
++
++        applier.NextRemaps = [new ObjectIdRemap(PointLayer, 501, 777)];
++
++        await sut.UndoAsync();
++
++        Assert.Equal(777, journal.PeekUndo()!.Changes[0].Identity.ObjectId);
++    }
++
++    // ---------------------------------------------------------------- redo
++
++    [Fact]
++    public async Task Redo_AppliesTheOperationForwardsAndMovesItBack()
++    {
++        journal.Record(CreateEntry("Add Canopy Point",
++            [FeatureChange.Insert(CreateSnapshot(501, layer: PointLayer))]));
++        await sut.UndoAsync();
++        applier.Applied.Clear();
++
++        await sut.RedoAsync();
++
++        var change = Assert.Single(Assert.Single(applier.Applied));
++        Assert.Equal(FeatureChangeKind.Insert, change.Kind);
++        Assert.Equal(1, journal.UndoDepth);
++        Assert.Equal(0, journal.RedoDepth);
++    }
++
++    // ---------------------------------------------------------------- refusals
++
++    [Fact]
++    public async Task Undo_WithNothingRecorded_DoesNothing()
++    {
++        await sut.UndoAsync();
++
++        Assert.Empty(applier.Applied);
++        Assert.Equal(0, editingOperations.DeactivateCalls);
++    }
++
++    [Fact]
++    public async Task Undo_OfAnEntryFromAnotherCase_ClearsTheHistoryRatherThanApplyingIt()
++    {
++        journal.Record(CreateEntry(caseKey: "CASE-999"));
++
++        await sut.UndoAsync();
++
++        Assert.Empty(applier.Applied);
++        Assert.Equal(0, journal.UndoDepth);
++    }
++
++    [Fact]
++    public async Task Undo_WhenSomeoneElseChangedTheData_RefusesAndDropsTheEntry()
++    {
++        journal.Record(CreateEntry("Add Canopy Point"));
++        detector.Result = ConflictResult.Conflict("Someone else changed it.", CreateIdentity(501, layer: PointLayer));
++
++        await sut.UndoAsync();
++
++        Assert.Empty(applier.Applied);
++        Assert.Equal(0, journal.UndoDepth);
++        Assert.Equal(0, journal.RedoDepth);
++        Assert.Contains(feedback.WarningNotifications,
++            w => w.Title == "Undo" && w.Message.Contains("removed from your history"));
++    }
++
++    [Fact]
++    public async Task Undo_WhenAConflictNamesRows_DropsEveryOtherEntryTouchingThem()
++    {
++        journal.Record(CreateEntryTouching(501));
++        journal.Record(CreateEntryTouching(501));
++        detector.Result = ConflictResult.Conflict("Someone else changed it.", CreateIdentity(501));
++
++        await sut.UndoAsync();
++
++        Assert.Equal(0, journal.UndoDepth);
++    }
++
++    [Fact]
++    public async Task Undo_WhenTheWriteFails_ClearsTheHistoryAndAsksForAReload()
++    {
++        journal.Record(CreateEntry());
++        applier.NextResult = ChangeApplyResult.Failed("the service said no");
++
++        var reloaded = false;
++        messenger.Register<RefreshMessage>(this, (_, _) => reloaded = true);
++
++        await sut.UndoAsync();
++
++        Assert.Equal(0, journal.UndoDepth);
++        Assert.Equal(0, journal.RedoDepth);
++        Assert.True(reloaded);
++        Assert.Contains(feedback.ErrorNotifications, e => e.Message.Contains("the service said no"));
++    }
++
++    [Fact]
++    public async Task Undo_DoesNotRunTwiceAtOnce()
++    {
++        // The toolbar button fires without waiting, so a double click arrives as two calls.
++        journal.Record(CreateEntry());
++        journal.Record(CreateEntry());
++
++        var gate = new TaskCompletionSource();
++        applier.Gate = gate.Task;
++
++        var first = sut.UndoAsync();
++        var second = sut.UndoAsync();
++
++        Assert.True(second.IsCompleted);
++
++        gate.SetResult();
++        await first;
++
++        Assert.Single(applier.Applied);
++    }
++
++    // ---------------------------------------------------------------- fakes
++
++    private sealed class FakeConflictDetector : IEditConflictDetector
++    {
++        public ConflictResult Result { get; set; } = ConflictResult.None;
++
++        public Task<ConflictResult> CheckAsync(EditOperationEntry entry, EditHistoryDirection direction) =>
++            Task.FromResult(Result);
++    }
++
++    private sealed class FakeApplier : IFeatureChangeApplier
++    {
++        public List<IReadOnlyList<FeatureChange>> Applied { get; } = [];
++        public IReadOnlyList<ObjectIdRemap> NextRemaps { get; set; } = [];
++        public ChangeApplyResult? NextResult { get; set; }
++        public Task? Gate { get; set; }
++
++        public async Task<ChangeApplyResult> ApplyAsync(IReadOnlyList<FeatureChange> changes)
++        {
++            if (Gate is not null)
++            {
++                await Gate;
++            }
++
++            Applied.Add(changes);
++
++            return NextResult ?? ChangeApplyResult.Applied(NextRemaps);
++        }
++    }
++
++    private sealed class FakeEditingOperations : IEditingOperationsManager
++    {
++        public int DeactivateCalls { get; private set; }
++
++        public Task ActivateTool(EditingTool tool, string targetLayerName) => Task.CompletedTask;
++
++        public Task DeactivateAll(EditingTool? tool)
++        {
++            DeactivateCalls++;
++            return Task.CompletedTask;
++        }
++    }
++
++    private sealed class FakeSelectionClearer : IEditSelectionClearer
++    {
++        public int Calls { get; private set; }
++
++        public Task ClearAsync()
++        {
++            Calls++;
++            return Task.CompletedTask;
++        }
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryTestData.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryTestData.cs
+new file mode 100644
+index 0000000..eb7eb18
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryTestData.cs
+@@ -0,0 +1,48 @@
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Builders for the history records. Named and called the same way as ArcGisTestFactory,
++/// so a call site always shows that it is test data being constructed.
++/// </summary>
++internal static class EditHistoryTestData
++{
++    public const string Layer = "LPIS_Poly";
++    public const string CaseKey = "CASE-1";
++
++    public static FeatureIdentity CreateIdentity(long objectId, string? businessKey = null, string layer = Layer) =>
++        new(layer, objectId, businessKey is null ? null : "POLYGONID", businessKey);
++
++    public static FeatureSnapshot CreateSnapshot(
++        long objectId,
++        string? businessKey = null,
++        string? geometryJson = "{\"rings\":[]}",
++        DateTime? stamp = null,
++        string layer = Layer,
++        IReadOnlyDictionary<string, object?>? attributes = null) =>
++        new(
++            CreateIdentity(objectId, businessKey, layer),
++            geometryJson,
++            "LATESTMOD",
++            stamp,
++            // Same comparer the production factory uses. Attribute name casing genuinely varies
++            // in this codebase, so a case sensitive fixture would not exercise what ships.
++            attributes ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
++            {
++                ["POLYGONID"] = businessKey
++            });
++
++    public static EditOperationEntry CreateEntry(
++        string name = "Edit Vertex",
++        IReadOnlyList<FeatureChange>? changes = null,
++        string caseKey = CaseKey) =>
++        EditOperationEntry.Create(
++            name,
++            caseKey,
++            changes ?? [FeatureChange.Update(CreateSnapshot(1, "100"), CreateSnapshot(1, "100"))],
++            DateTime.UtcNow);
++
++    public static EditOperationEntry CreateEntryTouching(long objectId, string? businessKey = null) =>
++        CreateEntry(changes: [FeatureChange.Update(CreateSnapshot(objectId, businessKey), CreateSnapshot(objectId, businessKey))]);
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureChangeTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureChangeTests.cs
+new file mode 100644
+index 0000000..8565e8d
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureChangeTests.cs
+@@ -0,0 +1,111 @@
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using static WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.EditHistoryTestData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++public class FeatureChangeTests
++{
++    [Fact]
++    public void Insert_InvertsToDeleteOfTheInsertedRow()
++    {
++        var after = CreateSnapshot(5, "500");
++
++        var inverse = FeatureChange.Insert(after).Inverse();
++
++        Assert.Equal(FeatureChangeKind.Delete, inverse.Kind);
++        Assert.Same(after, inverse.Before);
++        Assert.Null(inverse.After);
++    }
++
++    [Fact]
++    public void Delete_InvertsToInsertOfTheCapturedRow()
++    {
++        var before = CreateSnapshot(5, "500");
++
++        var inverse = FeatureChange.Delete(before).Inverse();
++
++        Assert.Equal(FeatureChangeKind.Insert, inverse.Kind);
++        Assert.Same(before, inverse.After);
++        Assert.Null(inverse.Before);
++    }
++
++    [Fact]
++    public void Update_InvertsToUpdateBackToThePreviousState()
++    {
++        var before = CreateSnapshot(5, "500", geometryJson: "before");
++        var after = CreateSnapshot(5, "500", geometryJson: "after");
++
++        var inverse = FeatureChange.Update(before, after).Inverse();
++
++        Assert.Equal(FeatureChangeKind.Update, inverse.Kind);
++        Assert.Same(after, inverse.Before);
++        Assert.Same(before, inverse.After);
++    }
++
++    [Fact]
++    public void Inverse_AppliedTwice_ReturnsTheOriginalChange()
++    {
++        var original = FeatureChange.Update(CreateSnapshot(1, "100", geometryJson: "a"), CreateSnapshot(1, "100", geometryJson: "b"));
++
++        var roundTripped = original.Inverse().Inverse();
++
++        Assert.Equal(original, roundTripped);
++    }
++
++    [Fact]
++    public void InverseChanges_AreAppliedInReverseOrderSoChildrenGoBeforeParents()
++    {
++        var parent = FeatureChange.Insert(CreateSnapshot(1, "100"));
++        var childA = FeatureChange.Insert(CreateSnapshot(2, "100", layer: "LPIS_CRNs"));
++        var childB = FeatureChange.Insert(CreateSnapshot(3, "100", layer: "LPIS_CRNs"));
++
++        var inverse = CreateEntry(changes: [parent, childA, childB]).InverseChanges();
++
++        Assert.Equal(3, inverse.Count);
++        Assert.Equal(3, inverse[0].Identity.ObjectId);
++        Assert.Equal(2, inverse[1].Identity.ObjectId);
++        Assert.Equal(1, inverse[2].Identity.ObjectId);
++        Assert.All(inverse, change => Assert.Equal(FeatureChangeKind.Delete, change.Kind));
++    }
++
++    [Theory]
++    [InlineData(FeatureChangeKind.Insert)]
++    [InlineData(FeatureChangeKind.Delete)]
++    [InlineData(FeatureChangeKind.Update)]
++    public void AChangeCarryingTheWrongSnapshots_IsRefusedAtConstruction(FeatureChangeKind kind)
++    {
++        Assert.Throws<ArgumentException>(() => new FeatureChange(kind, null, null));
++    }
++
++    [Fact]
++    public void AnInsertCarryingABeforeSnapshot_IsRefused()
++    {
++        Assert.Throws<ArgumentException>(
++            () => new FeatureChange(FeatureChangeKind.Insert, CreateSnapshot(1, "100"), CreateSnapshot(1, "100")));
++    }
++
++    [Fact]
++    public void ADeleteCarryingAnAfterSnapshot_IsRefused()
++    {
++        Assert.Throws<ArgumentException>(
++            () => new FeatureChange(FeatureChangeKind.Delete, CreateSnapshot(1, "100"), CreateSnapshot(1, "100")));
++    }
++
++    [Fact]
++    public void WithSnapshots_KeepsTheKindAndValidatesTheResult()
++    {
++        var original = FeatureChange.Update(CreateSnapshot(1, "100"), CreateSnapshot(1, "100"));
++        var moved = original.WithSnapshots(CreateSnapshot(2, "100"), CreateSnapshot(2, "100"));
++
++        Assert.Equal(FeatureChangeKind.Update, moved.Kind);
++        Assert.Equal(2, moved.Identity.ObjectId);
++    }
++
++    [Fact]
++    public void Reference_FallsBackToTheBeforeSnapshotForADelete()
++    {
++        var before = CreateSnapshot(9, "900");
++
++        Assert.Same(before, FeatureChange.Delete(before).Reference);
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityPolicyTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityPolicyTests.cs
+new file mode 100644
+index 0000000..254ad01
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityPolicyTests.cs
+@@ -0,0 +1,87 @@
++using WG.MiEditor.Configuration.AppSettings;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using WG.MiEditor.Tests.Common.MockData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++public class FeatureIdentityPolicyTests
++{
++    private readonly Layers layers = CreateLayers();
++    private readonly FeatureIdentityPolicy sut;
++
++    public FeatureIdentityPolicyTests() => sut = new FeatureIdentityPolicy(layers);
++
++    [Fact]
++    public void LpisParcel_UsesPolygonIdAsItsBusinessKey()
++    {
++        Assert.Equal("POLYGONID", sut.BusinessKeyField(layers.LPIS_Poly));
++    }
++
++    [Fact]
++    public void LpisParcel_StampsLatestModNotModifiedDate()
++    {
++        Assert.Equal("LATESTMOD", sut.StampField(layers.LPIS_Poly));
++    }
++
++    [Fact]
++    public void OtherLayers_StampModifiedDate()
++    {
++        Assert.Equal("MODIFIEDDT", sut.StampField(layers.Canopy_Point));
++    }
++
++    [Fact]
++    public void ChildTablesOfAParcel_HaveNoBusinessKey()
++    {
++        // POLYGONID on these layers references the parent parcel and repeats across many
++        // rows, so it identifies a parcel rather than a row.
++        Assert.Null(sut.BusinessKeyField(layers.LPIS_CRNs));
++        Assert.Null(sut.BusinessKeyField(layers.Found_Info));
++    }
++
++    [Fact]
++    public void DeductionAndCanopyLayers_HaveNoBusinessKey()
++    {
++        // LPISPOLYID is a parent reference assigned from the containing parcel, so many
++        // canopy points share one value. These layers rely on object id remapping.
++        Assert.Null(sut.BusinessKeyField(layers.Canopy_Point));
++        Assert.Null(sut.BusinessKeyField(layers.Permanent_Deduction));
++        Assert.Null(sut.BusinessKeyField(layers.Canopy_Poly));
++    }
++
++    [Fact]
++    public void UnknownLayer_HasNoBusinessKeyRatherThanAGuessedOne()
++    {
++        Assert.Null(sut.BusinessKeyField("Some_Unmapped_Layer"));
++    }
++
++    [Fact]
++    public void LayerMatching_IsCaseInsensitive()
++    {
++        Assert.Equal("POLYGONID", sut.BusinessKeyField(layers.LPIS_Poly.ToUpperInvariant()));
++    }
++
++    [Fact]
++    public void UnconfiguredLayerName_DoesNotMatchEverything()
++    {
++        var blank = AppSettingsMockData.CreateAppSettings().Layers;
++
++        Assert.Null(new FeatureIdentityPolicy(blank).BusinessKeyField(string.Empty));
++    }
++
++    private static Layers CreateLayers()
++    {
++        var layers = AppSettingsMockData.CreateAppSettings().Layers;
++
++        layers.LPIS_Poly = "LPIS_Poly";
++        layers.LPIS_CRNs = "LPIS_CRNs";
++        layers.Found_Info = "Found_Info";
++        layers.DeclaredInfo = "DeclaredInfo";
++        layers.Canopy_Point = "Canopy_Point";
++        layers.Canopy_Poly = "Canopy_Poly";
++        layers.Permanent_Deduction = "Permanent_Deduction";
++        layers.Tech_Perm_Ddn = "Tech_Perm_Ddn";
++        layers.Published_Habitat = "Published_Habitat";
++
++        return layers;
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityTests.cs
+new file mode 100644
+index 0000000..cbd3ffb
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureIdentityTests.cs
+@@ -0,0 +1,69 @@
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using static WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.EditHistoryTestData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++public class FeatureIdentityTests
++{
++    [Fact]
++    public void RowsWithTheSameBusinessKey_AreTheSameRowEvenAfterTheObjectIdChanges()
++    {
++        var deleted = new FeatureIdentity("LPIS_Poly", 42, "POLYGONID", "10432");
++        var restored = new FeatureIdentity("LPIS_Poly", 87, "POLYGONID", "10432");
++
++        Assert.True(deleted.SameRowAs(restored));
++    }
++
++    [Fact]
++    public void WithoutABusinessKey_RowsAreDistinguishedByObjectId()
++    {
++        var first = new FeatureIdentity("Canopy_Point", 501);
++        var second = new FeatureIdentity("Canopy_Point", 502);
++
++        Assert.False(first.SameRowAs(second));
++        Assert.True(first.SameRowAs(new FeatureIdentity("Canopy_Point", 501)));
++    }
++
++    [Fact]
++    public void RowsOnDifferentLayers_AreNeverTheSameRow()
++    {
++        var parcel = new FeatureIdentity("LPIS_Poly", 42, "POLYGONID", "10432");
++        var crn = new FeatureIdentity("LPIS_CRNs", 42, "POLYGONID", "10432");
++
++        Assert.False(parcel.SameRowAs(crn));
++    }
++
++    [Fact]
++    public void AForeignKeyWouldCollapseDistinctRows()
++    {
++        // This is why FeatureIdentityPolicy hands out a business key only for LPIS_Poly.
++        // If a parent reference such as LPISPOLYID were used as the key, these two separate
++        // canopy points would compare equal and one undo would clear both from the history.
++        var pointA = new FeatureIdentity("Canopy_Point", 501, "LPISPOLYID", "10432");
++        var pointB = new FeatureIdentity("Canopy_Point", 502, "LPISPOLYID", "10432");
++
++        Assert.True(pointA.SameRowAs(pointB));
++    }
++
++    [Fact]
++    public void ASnapshotsAttributes_AreFoundWhateverTheCasing()
++    {
++        // Attribute name casing genuinely varies across this codebase: LatestMod and LATESTMOD
++        // both appear, as do LPISPolyId and LPISPOLYID. A snapshot has to tolerate that, because
++        // FeatureIdentityPolicy names the field with one fixed spelling.
++        var snapshot = CreateSnapshot(1, "100");
++
++        Assert.True(snapshot.Attributes.ContainsKey("POLYGONID"));
++        Assert.True(snapshot.Attributes.ContainsKey("PolygonId"));
++        Assert.True(snapshot.Attributes.ContainsKey("polygonid"));
++    }
++
++    [Fact]
++    public void MixedKeyPresence_FallsBackToObjectId()
++    {
++        var keyed = new FeatureIdentity("LPIS_Poly", 42, "POLYGONID", "10432");
++        var unkeyed = new FeatureIdentity("LPIS_Poly", 42);
++
++        Assert.True(keyed.SameRowAs(unkeyed));
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureStateReaderTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureStateReaderTests.cs
+new file mode 100644
+index 0000000..8c6e511
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/FeatureStateReaderTests.cs
+@@ -0,0 +1,191 @@
++using Esri.ArcGISRuntime.Data;
++using Esri.ArcGISRuntime.Mapping;
++using Moq;
++using WG.MiEditor.Core.Services;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Tests.Common.TestFactories;
++using static WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.EditHistoryTestData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++/// <summary>
++/// The reader's own job is the where clause it builds and the batches it refuses, so that is what
++/// these assert. Mapping a returned row into a snapshot belongs to FeatureSnapshotFactory, which
++/// needs a real ServiceFeatureTable and is verified by running the app.
++/// </summary>
++public class FeatureStateReaderTests
++{
++    private const string Child = "Canopy Point";
++
++    private readonly Mock<IFeatureLayerService> featureLayerService = new();
++    private readonly FeatureStateReader sut;
++
++    private string lastWhereClause = string.Empty;
++    private int layerLookups;
++
++    public FeatureStateReaderTests()
++    {
++        var layer = new FeatureLayer(ArcGisTestFactory.CreateTable()) { Name = Layer };
++
++        featureLayerService
++            .Setup(s => s.GetFeatureLayerAsync(It.IsAny<string>()))
++            .Returns(() =>
++            {
++                layerLookups++;
++                return Task.FromResult<FeatureLayer?>(LayerExists ? layer : null);
++            });
++
++        // Returning nothing found is enough: every assertion here is about the question asked,
++        // not the answer. An ArcGISFeature cannot be constructed outside a real table anyway.
++        featureLayerService
++            .Setup(s => s.GetQueryFeaturesAsync(It.IsAny<FeatureLayer>(), It.IsAny<QueryParameters>()))
++            .Returns((FeatureLayer _, QueryParameters query) =>
++            {
++                lastWhereClause = query.WhereClause;
++                return Task.FromResult<List<ArcGISFeature>?>([]);
++            });
++
++        featureLayerService
++            .Setup(s => s.GetArcGISFeatureAsync(It.IsAny<FeatureLayer>(), It.IsAny<QueryParameters>()))
++            .Returns((FeatureLayer _, QueryParameters query) =>
++            {
++                lastWhereClause = query.WhereClause;
++                return Task.FromResult<ArcGISFeature?>(null);
++            });
++
++        sut = new FeatureStateReader(
++            featureLayerService.Object,
++            Mock.Of<IFeatureSnapshotFactory>(),
++            Mock.Of<ILoggerService>());
++    }
++
++    private bool LayerExists { get; set; } = true;
++
++    // ---------------------------------------------------------------- the clause it builds
++
++    [Fact]
++    public async Task AKeyedBatch_IsQueriedOnTheBusinessKey()
++    {
++        await sut.ReadManyAsync(Layer, [CreateIdentity(1, "100"), CreateIdentity(2, "200")]);
++
++        Assert.Equal("POLYGONID IN (100, 200)", lastWhereClause);
++    }
++
++    [Fact]
++    public async Task AKeylessBatch_IsQueriedOnTheObjectId()
++    {
++        await sut.ReadManyAsync(Child, [CreateIdentity(7, layer: Child), CreateIdentity(8, layer: Child)]);
++
++        Assert.Equal("OBJECTID IN (7, 8)", lastWhereClause);
++    }
++
++    [Fact]
++    public async Task ANonNumericKey_IsQuotedAndItsApostrophesEscaped()
++    {
++        await sut.ReadManyAsync(Layer, [new FeatureIdentity(Layer, 1, "POLYGONID", "O'Brien")]);
++
++        Assert.Equal("POLYGONID IN ('O''Brien')", lastWhereClause);
++    }
++
++    [Fact]
++    public async Task EveryIdentityInAKeyedBatch_ReachesTheClause()
++    {
++        // The defect this guards: an earlier version filtered the batch while building the clause,
++        // so some identities were never asked about and their absence read as somebody's deletion.
++        var identities = Enumerable.Range(1, 5).Select(i => CreateIdentity(i, $"{i}00")).ToList();
++
++        await sut.ReadManyAsync(Layer, identities);
++
++        Assert.All(identities, i => Assert.Contains(i.BusinessKeyValue!, lastWhereClause));
++    }
++
++    // ---------------------------------------------------------------- what it refuses
++
++    [Fact]
++    public async Task ABatchMixingKeyedAndKeylessIdentities_IsRefused()
++    {
++        var error = await Assert.ThrowsAsync<ArgumentException>(() =>
++            sut.ReadManyAsync(Layer, [CreateIdentity(1, "100"), CreateIdentity(2)]));
++
++        Assert.Contains("all keyed or all keyless", error.Message);
++    }
++
++    [Fact]
++    public async Task ABatchMixingTwoBusinessKeyFields_IsRefused()
++    {
++        // Not reachable through FeatureIdentityPolicy today, which maps one field per layer. The
++        // guard is here because the IN clause can only name the first field, and would silently
++        // query the wrong column for the rest.
++        var error = await Assert.ThrowsAsync<ArgumentException>(() =>
++            sut.ReadManyAsync(Layer,
++            [
++                new FeatureIdentity(Layer, 1, "POLYGONID", "100"),
++                new FeatureIdentity(Layer, 2, "LPISPOLYID", "200"),
++            ]));
++
++        Assert.Contains("one business key field", error.Message);
++    }
++
++    [Fact]
++    public async Task ABadBatch_IsRefusedBeforeTheLayerIsEvenLookedUp()
++    {
++        // A caller mistake must not be reported as whichever environment failure came first.
++        LayerExists = false;
++
++        await Assert.ThrowsAsync<ArgumentException>(() =>
++            sut.ReadManyAsync(Layer, [CreateIdentity(1, "100"), CreateIdentity(2)]));
++
++        Assert.Equal(0, layerLookups);
++    }
++
++    [Fact]
++    public async Task AMissingLayer_IsAFailureRatherThanAnEmptyResult()
++    {
++        // An empty result cannot be told apart from "somebody deleted these rows", and the
++        // conflict detector would report exactly that to the officer.
++        LayerExists = false;
++
++        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
++            sut.ReadManyAsync(Layer, [CreateIdentity(1, "100")]));
++
++        Assert.Contains(Layer, error.Message);
++    }
++
++    [Fact]
++    public async Task AnEmptyBatch_AsksTheServiceNothing()
++    {
++        var result = await sut.ReadManyAsync(Layer, []);
++
++        Assert.Empty(result);
++        Assert.Equal(0, layerLookups);
++    }
++
++    // ---------------------------------------------------------------- the single row read
++
++    [Fact]
++    public async Task ASingleKeyedRow_IsQueriedOnTheBusinessKey()
++    {
++        await sut.ReadAsync(CreateIdentity(1, "100"));
++
++        Assert.Equal("POLYGONID = 100", lastWhereClause);
++    }
++
++    [Fact]
++    public async Task ASingleKeylessRow_IsQueriedOnTheObjectId()
++    {
++        await sut.ReadAsync(CreateIdentity(7, layer: Child));
++
++        Assert.Equal("OBJECTID = 7", lastWhereClause);
++    }
++
++    [Fact]
++    public async Task ASingleRowOnAMissingLayer_IsNullRatherThanAFailure()
++    {
++        // Deliberately unlike ReadManyAsync. The recorder calls this and wants to skip the row
++        // rather than fail the save it is recording.
++        LayerExists = false;
++
++        Assert.Null(await sut.ReadAsync(CreateIdentity(1, "100")));
++    }
++}
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarControlViewModelTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarControlViewModelTests.cs
+index 279f44c..748fe3a 100644
+--- a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarControlViewModelTests.cs
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarControlViewModelTests.cs
+@@ -1,5 +1,6 @@
+ 
+ using CommunityToolkit.Mvvm.Messaging;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar.Activation;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar.Descriptors;
+@@ -16,6 +17,7 @@ public class ToolbarControlViewModelTests
+ {
+     private readonly StrongReferenceMessenger messenger = new();
+     private readonly ToolActivationCoordinator coordinator = new();
++    private readonly FakeEditHistoryService editHistory = new();
+     private readonly ToolbarControlViewModel sut;
+ 
+     public ToolbarControlViewModelTests()
+@@ -27,10 +29,12 @@ public class ToolbarControlViewModelTests
+             new InfoToolDescriptor(),
+             new RefreshToolDescriptor(),
+             new PreviousViewToolDescriptor(),
+-            new NextViewToolDescriptor()
++            new NextViewToolDescriptor(),
++            new UndoToolDescriptor(),
++            new RedoToolDescriptor()
+         ]);
+ 
+-        sut = new ToolbarControlViewModel(messenger, coordinator, registry);
++        sut = new ToolbarControlViewModel(messenger, coordinator, registry, editHistory);
+     }
+ 
+     private IconButtonControlViewModel<StandardTool> Button(StandardTool tool) =>
+@@ -46,7 +50,8 @@ public class ToolbarControlViewModelTests
+         Assert.Equal(
+             [
+                 StandardTool.Plus, StandardTool.Minus, StandardTool.Info,
+-                StandardTool.Refresh, StandardTool.PreviousView, StandardTool.NextView
++                StandardTool.Refresh, StandardTool.PreviousView, StandardTool.NextView,
++                StandardTool.Undo, StandardTool.Redo
+             ],
+             sut.Tools.Select(t => t.Tool));
+     }
+@@ -212,4 +217,82 @@ public class ToolbarControlViewModelTests
+         Assert.True(Button(StandardTool.PreviousView).IsEnabled);
+         Assert.False(Button(StandardTool.NextView).IsEnabled);
+     }
++
++    [Fact]
++    public void UndoAndRedoStartDisabled()
++    {
++        Assert.False(Button(StandardTool.Undo).IsEnabled);
++        Assert.False(Button(StandardTool.Redo).IsEnabled);
++    }
++
++    [Fact]
++    public void Undo_AsksTheEditHistoryToUndo()
++    {
++        Click(StandardTool.Undo);
++
++        Assert.Equal(1, editHistory.UndoCalls);
++        Assert.Equal(0, editHistory.RedoCalls);
++    }
++
++    [Fact]
++    public void Redo_AsksTheEditHistoryToRedo()
++    {
++        Click(StandardTool.Redo);
++
++        Assert.Equal(1, editHistory.RedoCalls);
++        Assert.Equal(0, editHistory.UndoCalls);
++    }
++
++    [Fact]
++    public void UndoAndRedo_DoNotBridgeStandardToolsInUse()
++    {
++        // The same rule the view history buttons follow: using them must not disturb the
++        // active Info mode or the AOI control.
++        var bridged = false;
++        messenger.Register<StandardToolsInUseMessage>(this, (_, _) => bridged = true);
++
++        Click(StandardTool.Undo);
++        Click(StandardTool.Redo);
++
++        Assert.False(bridged);
++    }
++
++    [Fact]
++    public void EditHistoryChangedMessage_DrivesTheUndoAndRedoButtons()
++    {
++        sut.Receive(new EditHistoryChangedMessage(CanUndo: true, CanRedo: false));
++
++        Assert.True(Button(StandardTool.Undo).IsEnabled);
++        Assert.False(Button(StandardTool.Redo).IsEnabled);
++
++        sut.Receive(new EditHistoryChangedMessage(CanUndo: false, CanRedo: true));
++
++        Assert.False(Button(StandardTool.Undo).IsEnabled);
++        Assert.True(Button(StandardTool.Redo).IsEnabled);
++    }
++
++    [Fact]
++    public void EditHistoryChangedMessage_LeavesTheViewHistoryButtonsAlone()
++    {
++        sut.Receive(new MapViewNavigationButtonsEnabledMessage(IsPrevEnabled: true, IsNextEnabled: true));
++
++        sut.Receive(new EditHistoryChangedMessage(CanUndo: false, CanRedo: false));
++
++        Assert.True(Button(StandardTool.PreviousView).IsEnabled);
++        Assert.True(Button(StandardTool.NextView).IsEnabled);
++    }
++
++    private sealed class FakeEditHistoryService : IEditHistoryService
++    {
++        public int UndoCalls { get; private set; }
++        public int RedoCalls { get; private set; }
++        public int ClearCalls { get; private set; }
++
++        public bool CanUndo { get; set; }
++        public bool CanRedo { get; set; }
++
++        public Task UndoAsync() { UndoCalls++; return Task.CompletedTask; }
++        public Task RedoAsync() { RedoCalls++; return Task.CompletedTask; }
++        public void ClearHistory() => ClearCalls++;
++    }
+ }
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/UndoRedoToolDescriptorTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/UndoRedoToolDescriptorTests.cs
+new file mode 100644
+index 0000000..2b5e095
+--- /dev/null
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/UndoRedoToolDescriptorTests.cs
+@@ -0,0 +1,88 @@
++using WG.MiEditor.MainApp.ViewModels.Toolbar.Descriptors.StandardTools;
++using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Models.Toolbar;
++using Xunit;
++
++namespace WG.MiEditor.MainApp.Tests.ViewModels.Toolbar;
++
++public class UndoRedoToolDescriptorTests
++{
++    private readonly UndoToolDescriptor undo = new();
++    private readonly RedoToolDescriptor redo = new();
++
++    [Fact]
++    public void BothSitOnTheStandardToolbar()
++    {
++        Assert.Equal(ToolbarId.Standard, undo.ToolbarId);
++        Assert.Equal(ToolbarId.Standard, redo.ToolbarId);
++    }
++
++    [Fact]
++    public void BothAreOneShotActionsRatherThanStickyModes()
++    {
++        // A mode would stay highlighted and would take part in the single active tool rule,
++        // which is wrong for a button that performs something and finishes.
++        Assert.Equal(ToolActivation.Action, undo.Activation);
++        Assert.Equal(ToolActivation.Action, redo.Activation);
++    }
++
++    [Fact]
++    public void TheyFollowTheViewHistoryButtonsInOrder()
++    {
++        Assert.Equal(6, undo.Order);
++        Assert.Equal(7, redo.Order);
++    }
++
++    [Fact]
++    public void BothShowOnEveryGeometryType()
++    {
++        Assert.Equal(GeometryScopes.All, undo.Geometries);
++        Assert.Equal(GeometryScopes.All, redo.Geometries);
++    }
++
++    [Fact]
++    public void NeitherBelongsToAFlyoutGroup()
++    {
++        Assert.Null(undo.Group);
++        Assert.Null(redo.Group);
++    }
++
++    [Fact]
++    public void EachCarriesItsOwnTool()
++    {
++        Assert.Equal(StandardTool.Undo, undo.Tool);
++        Assert.Equal(StandardTool.Redo, redo.Tool);
++    }
++
++    [Fact]
++    public void TooltipsNameTheAction()
++    {
++        Assert.Equal("Undo", undo.Tooltip);
++        Assert.Equal("Redo", redo.Tooltip);
++    }
++
++    [Fact]
++    public void EachNamesAnIcon()
++    {
++        // Placeholder artwork for now, so this asserts only that an icon is named. The two
++        // currently borrow the view history arrows, which is recorded in the descriptors.
++        Assert.False(string.IsNullOrWhiteSpace(undo.Icon));
++        Assert.False(string.IsNullOrWhiteSpace(redo.Icon));
++    }
++
++    [Theory]
++    [InlineData(typeof(UndoToolDescriptor))]
++    [InlineData(typeof(RedoToolDescriptor))]
++    public void BothRegisterThemselvesForDiscovery(Type descriptor)
++    {
++        // The registry is built from every IToolDescriptor the scanner finds, so a missing
++        // attribute means the button simply never appears.
++        var attribute = descriptor.GetCustomAttributes(typeof(RegisterServiceAttribute), false)
++            .Cast<RegisterServiceAttribute>()
++            .SingleOrDefault();
++
++        Assert.NotNull(attribute);
++        Assert.Equal(ServiceLifetime.Singleton, attribute!.Lifetime);
++        Assert.Contains(typeof(IToolDescriptor), attribute.As!);
++    }
++}
+diff --git a/Tests/MiEditor.Tests.Common/Fakes/FakeCaseContext.cs b/Tests/MiEditor.Tests.Common/Fakes/FakeCaseContext.cs
+new file mode 100644
+index 0000000..9d56f76
+--- /dev/null
++++ b/Tests/MiEditor.Tests.Common/Fakes/FakeCaseContext.cs
+@@ -0,0 +1,36 @@
++using WG.MiEditor.Models;
++using WG.MiEditor.Shared.Helpers;
++
++namespace WG.MiEditor.Tests.Common;
++
++/// <summary>
++/// A settable case context. Moq would do for the properties, but GetSelectedCase sends a request
++/// message in the real implementation, and a fake makes it obvious that nothing here does.
++/// </summary>
++public sealed class FakeCaseContext : ICaseContext
++{
++    public string? CRN { get; set; }
++    public string? CaseNo { get; set; }
++    public int CaseId { get; set; }
++    public string? FileRefNumber { get; set; }
++
++    public CaseModel? SelectedCase { get; set; }
++
++    public Task<CaseModel> GetSelectedCase() =>
++        SelectedCase is null
++            ? throw new InvalidOperationException("No case has been set on the fake.")
++            : Task.FromResult(SelectedCase);
++
++    public void SetSelectedCase(CaseModel? caseModel)
++    {
++        SelectedCase = caseModel;
++
++        if (caseModel is null)
++        {
++            CRN = null;
++            CaseNo = null;
++            CaseId = 0;
++            FileRefNumber = null;
++        }
++    }
++}
