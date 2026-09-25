@@ -1,0 +1,756 @@
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryService.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryService.cs
+new file mode 100644
+index 0000000..8f94e37
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/IEditHistoryService.cs
+@@ -0,0 +1,21 @@
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// What the Undo and Redo buttons talk to. It owns the sequencing and the safety checks and
++/// keeps the journal, the conflict check and the applier behind it, so the toolbar knows
++/// nothing about how an operation is reversed.
++/// </summary>
++public interface IEditHistoryService
++{
++    bool CanUndo { get; }
++    bool CanRedo { get; }
++
++    Task UndoAsync();
++    Task RedoAsync();
++
++    /// <summary>
++    /// Forgets everything recorded. Called when the case changes, because history recorded
++    /// against one case must never be applied against another.
++    /// </summary>
++    void ClearHistory();
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryService.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryService.cs
+new file mode 100644
+index 0000000..1504240
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistoryService.cs
+@@ -0,0 +1,77 @@
++using CommunityToolkit.Mvvm.Messaging;
++using WG.MiEditor.Messages.CaseManagement;
++using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Messages.Toolbar;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Drives undo and redo. At this stage it owns two things that are complete in their own
++/// right: telling the toolbar whether undo and redo are available, and forgetting the
++/// history when the case changes.
++/// <para>
++/// Reversing an operation needs the conflict check and the applier, which arrive with the
++/// recording work. Until then nothing records, so the journal is always empty, CanUndo is
++/// always false and the buttons stay disabled. UndoAsync and RedoAsync therefore guard and
++/// return rather than pretending to act: moving an entry between the lists without
++/// reversing anything would leave the journal describing a state the data is not in.
++/// </para>
++/// <para>
++/// Scoped because the applier and the conflict check will need IFeatureLayerService, which
++/// is Scoped. No scope is ever created in this application, so this is a singleton in
++/// practice, which is what the journal subscription below relies on.
++/// </para>
++/// </summary>
++[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IEditHistoryService) })]
++public sealed class EditHistoryService : IEditHistoryService
++{
++    private readonly IEditHistoryJournal journal;
++    private readonly IMessenger messenger;
++
++    public EditHistoryService(IEditHistoryJournal journal, IMessenger messenger)
++    {
++        this.journal = journal;
++        this.messenger = messenger;
++
++        journal.Changed += OnJournalChanged;
++
++        // The history belongs to one case. Clearing on each of these is the primary guard;
++        // the case key stamped on every entry is the second, for a message that never arrives.
++        messenger.Register<EditHistoryService, SelectedCaseMessage>(this, (r, _) => r.ClearHistory());
++        messenger.Register<EditHistoryService, SelectedCaseStartEditingMessage>(this, (r, _) => r.ClearHistory());
++        messenger.Register<EditHistoryService, SelectedCaseStopEditingMessage>(this, (r, _) => r.ClearHistory());
++        messenger.Register<EditHistoryService, ExitCaseMessage>(this, (r, _) => r.ClearHistory());
++    }
++
++    public bool CanUndo => journal.CanUndo;
++
++    public bool CanRedo => journal.CanRedo;
++
++    public Task UndoAsync()
++    {
++        if (!journal.CanUndo)
++        {
++            return Task.CompletedTask;
++        }
++
++        // Deliberately does not pop. Applying the inverse arrives with the recording work,
++        // and until it does, popping would tell the journal an operation had been reversed
++        // when the data still holds it.
++        return Task.CompletedTask;
++    }
++
++    public Task RedoAsync()
++    {
++        if (!journal.CanRedo)
++        {
++            return Task.CompletedTask;
++        }
++
++        return Task.CompletedTask;
++    }
++
++    public void ClearHistory() => journal.Clear();
++
++    private void OnJournalChanged(object? sender, EventArgs e) =>
++        messenger.Send(new EditHistoryChangedMessage(journal.CanUndo, journal.CanRedo));
++}
+diff --git a/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/UndoToolDescriptor.cs b/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/UndoToolDescriptor.cs
+new file mode 100644
+index 0000000..f8dad2c
+--- /dev/null
++++ b/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/UndoToolDescriptor.cs
+@@ -0,0 +1,21 @@
++using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Models.Toolbar;
++
++namespace WG.MiEditor.MainApp.ViewModels.Toolbar.Descriptors.StandardTools;
++
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IToolDescriptor) })]
++public sealed class UndoToolDescriptor : IToolDescriptor
++{
++    public ToolbarId ToolbarId => ToolbarId.Standard;
++
++    // Placeholder. There is no undo artwork yet, so this borrows the back arrow the previous
++    // view button uses. Replace with undo.png when the real icon lands; nothing else changes.
++    public string Icon => "previous_extent.png";
++
++    public string Tooltip => "Undo";
++    public int Order => 6;
++    public GeometryScopes Geometries => GeometryScopes.All;
++    public string? Group => null;
++    public ToolActivation Activation => ToolActivation.Action;
++    public ITool Tool => StandardTool.Undo;
++}
+diff --git a/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/RedoToolDescriptor.cs b/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/RedoToolDescriptor.cs
+new file mode 100644
+index 0000000..6dcf887
+--- /dev/null
++++ b/Src/MiEditor.MainApp/ViewModels/Toolbar/Descriptors/StandardTools/RedoToolDescriptor.cs
+@@ -0,0 +1,20 @@
++using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Models.Toolbar;
++
++namespace WG.MiEditor.MainApp.ViewModels.Toolbar.Descriptors.StandardTools;
++
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IToolDescriptor) })]
++public sealed class RedoToolDescriptor : IToolDescriptor
++{
++    public ToolbarId ToolbarId => ToolbarId.Standard;
++
++    // Placeholder, as with UndoToolDescriptor. Replace with redo.png when it lands.
++    public string Icon => "next_extent.png";
++
++    public string Tooltip => "Redo";
++    public int Order => 7;
++    public GeometryScopes Geometries => GeometryScopes.All;
++    public string? Group => null;
++    public ToolActivation Activation => ToolActivation.Action;
++    public ITool Tool => StandardTool.Redo;
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryServiceTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryServiceTests.cs
+new file mode 100644
+index 0000000..2663224
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistoryServiceTests.cs
+@@ -0,0 +1,124 @@
++using CommunityToolkit.Mvvm.Messaging;
++using WG.MiEditor.Configuration.AppSettings;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using WG.MiEditor.Messages.CaseManagement;
++using WG.MiEditor.Shared.Messages.Toolbar;
++using static WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.EditHistoryTestData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++public class EditHistoryServiceTests
++{
++    private readonly StrongReferenceMessenger messenger = new();
++    private readonly EditHistoryJournal journal = new(new EditHistoryInfo(MaxUndoDepth: 10));
++    private readonly EditHistoryService sut;
++
++    private readonly List<EditHistoryChangedMessage> published = [];
++
++    public EditHistoryServiceTests()
++    {
++        sut = new EditHistoryService(journal, messenger);
++        messenger.Register<EditHistoryChangedMessage>(this, (_, m) => published.Add(m));
++    }
++
++    [Fact]
++    public void WithNothingRecorded_NeitherUndoNorRedoIsAvailable()
++    {
++        Assert.False(sut.CanUndo);
++        Assert.False(sut.CanRedo);
++    }
++
++    [Fact]
++    public void AvailabilityFollowsTheJournal()
++    {
++        journal.Record(CreateEntry());
++
++        Assert.True(sut.CanUndo);
++        Assert.False(sut.CanRedo);
++
++        journal.PopUndoToRedo();
++
++        Assert.False(sut.CanUndo);
++        Assert.True(sut.CanRedo);
++    }
++
++    [Fact]
++    public void RecordingAnOperation_TellsTheToolbarWhatIsAvailable()
++    {
++        journal.Record(CreateEntry());
++
++        var message = Assert.Single(published);
++        Assert.True(message.CanUndo);
++        Assert.False(message.CanRedo);
++    }
++
++    [Fact]
++    public void ClearHistory_EmptiesTheJournalAndTellsTheToolbar()
++    {
++        journal.Record(CreateEntry());
++        published.Clear();
++
++        sut.ClearHistory();
++
++        Assert.Equal(0, journal.UndoDepth);
++        Assert.False(Assert.Single(published).CanUndo);
++    }
++
++    [Fact]
++    public void EveryCaseLifecycleMessage_ClearsTheHistory()
++    {
++        // Sent as their concrete types on purpose. The messenger dispatches by the static type
++        // of the argument, so sending these as object would register a different message type
++        // and reach nothing.
++        AssertClears(() => messenger.Send(new SelectedCaseMessage(null)));
++        AssertClears(() => messenger.Send(new SelectedCaseStartEditingMessage("Available")));
++        AssertClears(() => messenger.Send(new SelectedCaseStopEditingMessage()));
++        AssertClears(() => messenger.Send(new ExitCaseMessage()));
++
++        void AssertClears(Action send)
++        {
++            journal.Record(CreateEntry());
++            Assert.True(sut.CanUndo);
++
++            send();
++
++            Assert.False(sut.CanUndo);
++            Assert.Equal(0, journal.UndoDepth);
++        }
++    }
++
++    [Fact]
++    public async Task UndoAsync_DoesNothingWhileThereIsNothingToUndo()
++    {
++        await sut.UndoAsync();
++
++        Assert.Equal(0, journal.UndoDepth);
++        Assert.Equal(0, journal.RedoDepth);
++    }
++
++    [Fact]
++    public async Task UndoAsync_DoesNotMoveAnEntryBeforeTheInverseCanBeApplied()
++    {
++        // Applying the inverse arrives with the recording work. Until it does, the entry must
++        // stay where it is: moving it to the redo side would claim an operation had been
++        // reversed while the data still holds it.
++        journal.Record(CreateEntry());
++
++        await sut.UndoAsync();
++
++        Assert.Equal(1, journal.UndoDepth);
++        Assert.Equal(0, journal.RedoDepth);
++    }
++
++    [Fact]
++    public async Task RedoAsync_DoesNotMoveAnEntryEither()
++    {
++        journal.Record(CreateEntry());
++        journal.PopUndoToRedo();
++
++        await sut.RedoAsync();
++
++        Assert.Equal(0, journal.UndoDepth);
++        Assert.Equal(1, journal.RedoDepth);
++    }
++}
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/UndoRedoToolDescriptorTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/UndoRedoToolDescriptorTests.cs
+new file mode 100644
+index 0000000..2b5e095
+--- /dev/null
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/UndoRedoToolDescriptorTests.cs
+@@ -0,0 +1,88 @@
++using WG.MiEditor.MainApp.ViewModels.Toolbar.Descriptors.StandardTools;
++using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Models.Toolbar;
++using Xunit;
++
++namespace WG.MiEditor.MainApp.Tests.ViewModels.Toolbar;
++
++public class UndoRedoToolDescriptorTests
++{
++    private readonly UndoToolDescriptor undo = new();
++    private readonly RedoToolDescriptor redo = new();
++
++    [Fact]
++    public void BothSitOnTheStandardToolbar()
++    {
++        Assert.Equal(ToolbarId.Standard, undo.ToolbarId);
++        Assert.Equal(ToolbarId.Standard, redo.ToolbarId);
++    }
++
++    [Fact]
++    public void BothAreOneShotActionsRatherThanStickyModes()
++    {
++        // A mode would stay highlighted and would take part in the single active tool rule,
++        // which is wrong for a button that performs something and finishes.
++        Assert.Equal(ToolActivation.Action, undo.Activation);
++        Assert.Equal(ToolActivation.Action, redo.Activation);
++    }
++
++    [Fact]
++    public void TheyFollowTheViewHistoryButtonsInOrder()
++    {
++        Assert.Equal(6, undo.Order);
++        Assert.Equal(7, redo.Order);
++    }
++
++    [Fact]
++    public void BothShowOnEveryGeometryType()
++    {
++        Assert.Equal(GeometryScopes.All, undo.Geometries);
++        Assert.Equal(GeometryScopes.All, redo.Geometries);
++    }
++
++    [Fact]
++    public void NeitherBelongsToAFlyoutGroup()
++    {
++        Assert.Null(undo.Group);
++        Assert.Null(redo.Group);
++    }
++
++    [Fact]
++    public void EachCarriesItsOwnTool()
++    {
++        Assert.Equal(StandardTool.Undo, undo.Tool);
++        Assert.Equal(StandardTool.Redo, redo.Tool);
++    }
++
++    [Fact]
++    public void TooltipsNameTheAction()
++    {
++        Assert.Equal("Undo", undo.Tooltip);
++        Assert.Equal("Redo", redo.Tooltip);
++    }
++
++    [Fact]
++    public void EachNamesAnIcon()
++    {
++        // Placeholder artwork for now, so this asserts only that an icon is named. The two
++        // currently borrow the view history arrows, which is recorded in the descriptors.
++        Assert.False(string.IsNullOrWhiteSpace(undo.Icon));
++        Assert.False(string.IsNullOrWhiteSpace(redo.Icon));
++    }
++
++    [Theory]
++    [InlineData(typeof(UndoToolDescriptor))]
++    [InlineData(typeof(RedoToolDescriptor))]
++    public void BothRegisterThemselvesForDiscovery(Type descriptor)
++    {
++        // The registry is built from every IToolDescriptor the scanner finds, so a missing
++        // attribute means the button simply never appears.
++        var attribute = descriptor.GetCustomAttributes(typeof(RegisterServiceAttribute), false)
++            .Cast<RegisterServiceAttribute>()
++            .SingleOrDefault();
++
++        Assert.NotNull(attribute);
++        Assert.Equal(ServiceLifetime.Singleton, attribute!.Lifetime);
++        Assert.Contains(typeof(IToolDescriptor), attribute.As!);
++    }
++}
+diff --git a/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs b/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs
+index b1f8eb8..95c9181 100644
+--- a/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs
++++ b/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs
+@@ -13,6 +13,8 @@ public readonly struct StandardTool : ITool, IEquatable<StandardTool>
+     public static readonly StandardTool Refresh = new(nameof(Refresh));
+     public static readonly StandardTool PreviousView = new(nameof(PreviousView));
+     public static readonly StandardTool NextView = new( nameof(NextView));
++    public static readonly StandardTool Undo = new(nameof(Undo));
++    public static readonly StandardTool Redo = new(nameof(Redo));
+ 
+     public static readonly IEnumerable<StandardTool> All =
+     [
+@@ -21,7 +23,9 @@ public readonly struct StandardTool : ITool, IEquatable<StandardTool>
+         Info,
+         Refresh,
+         PreviousView,
+-        NextView
++        NextView,
++        Undo,
++        Redo
+     ];
+ 
+     public override string ToString() => Name;
+diff --git a/Src/MiEditor.Shared/Configuration/AppSettings/ApplicationSettings.cs b/Src/MiEditor.Shared/Configuration/AppSettings/ApplicationSettings.cs
+index 0d3f07f..514e252 100644
+--- a/Src/MiEditor.Shared/Configuration/AppSettings/ApplicationSettings.cs
++++ b/Src/MiEditor.Shared/Configuration/AppSettings/ApplicationSettings.cs
+@@ -25,6 +25,10 @@ public record ApplicationSettings
+     public required AppVersionInfo AppVersionInfo { get; init; }
+     public required MaxUAreaConfig MaxUAreaConfig { get; init; }
+     public required MapViewsInfo MapViewsInfo { get; init; }
++
++    // Not required, and defaulted, so binaries carrying this can still read an appsettings
++    // file written before the edit history existed.
++    public EditHistoryInfo EditHistory { get; init; } = new();
+     public required double MinTaAreaInHectares { get; init; }
+     public required double CoordinateZoomScale { get; init; }
+     public required BufferSettings BufferSettings { get; init; }
+diff --git a/Src/MiEditor.MainApp/MauiProgram.cs b/Src/MiEditor.MainApp/MauiProgram.cs
+index f07fa74..c2ae341 100644
+--- a/Src/MiEditor.MainApp/MauiProgram.cs
++++ b/Src/MiEditor.MainApp/MauiProgram.cs
+@@ -55,6 +55,7 @@ public static class MauiProgram
+         builder.Services.AddSingleton(sp => sp.GetRequiredService<ApplicationSettings>().Layers);
+         builder.Services.AddSingleton(sp => sp.GetRequiredService<ApplicationSettings>().OfflineDataSettings);
+         builder.Services.AddSingleton(sp => sp.GetRequiredService<ApplicationSettings>().Logging);
++        builder.Services.AddSingleton(sp => sp.GetRequiredService<ApplicationSettings>().EditHistory);
+ 
+         builder.Services.AddOptions<ApplicationSettings>();
+         builder.Services.AddServicesByConvention();
+diff --git a/Src/MiEditor.MainApp/AutoScanning.cs b/Src/MiEditor.MainApp/AutoScanning.cs
+index 557ddac..6d146e1 100644
+--- a/Src/MiEditor.MainApp/AutoScanning.cs
++++ b/Src/MiEditor.MainApp/AutoScanning.cs
+@@ -6,6 +6,7 @@ using MiEditor.Infrastructure.API;
+ using System.Reflection;
+ using WG.MiEditor.Configuration.AppSettings;
+ using WG.MiEditor.Core.Services;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.Core.Services.Drawing.Editing;
+ using WG.MiEditor.Core.Services.Drawing.Editing.AddFeatures.Manager;
+ using WG.MiEditor.Core.Services.Drawing.Editing.Managers;
+@@ -106,7 +107,8 @@ public static class AutoScanning
+         services.AddSingleton(sp => new ToolbarControlViewModel(
+             sp.GetRequiredService<IMessenger>(),
+             sp.GetRequiredService<IToolActivationCoordinator>(),
+-            sp.GetRequiredService<IToolDescriptorRegistry>()));
++            sp.GetRequiredService<IToolDescriptorRegistry>(),
++            sp.GetRequiredService<IEditHistoryService>()));
+ 
+         services.AddSingleton(sp => new EditingLayerToolbarViewModel(
+             sp.GetRequiredService<IMessenger>(),
+diff --git a/Src/MiEditor.MainApp/ViewModels/Toolbar/ToolbarControlViewModel.cs b/Src/MiEditor.MainApp/ViewModels/Toolbar/ToolbarControlViewModel.cs
+index 25c74d2..6a8dc63 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Toolbar/ToolbarControlViewModel.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Toolbar/ToolbarControlViewModel.cs
+@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Messaging;
+ using System.Collections.ObjectModel;
+ using WG.MiEditor.Enums;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar.Activation;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar.Descriptors;
+ using WG.MiEditor.Messages;
+ using WG.MiEditor.Shared.Messages.Map;
+@@ -16,15 +17,19 @@ namespace WG.MiEditor.MainApp.ViewModels.Toolbar;
+ // Registered as a singleton in AddToolbars (it needs the coordinator and registry), so
+ // no [RegisterService] attribute here, which would double-register it.
+ public partial class ToolbarControlViewModel : ObservableRecipient,
+-    IRecipient<MapViewNavigationButtonsEnabledMessage>
++    IRecipient<MapViewNavigationButtonsEnabledMessage>,
++    IRecipient<EditHistoryChangedMessage>
+ {
+     private readonly ToolActivationController<StandardTool> controller;
++    private readonly IEditHistoryService editHistory;
+ 
+     public ToolbarControlViewModel(
+         IMessenger messenger,
+         IToolActivationCoordinator coordinator,
+-        IToolDescriptorRegistry registry) : base(messenger)
++        IToolDescriptorRegistry registry,
++        IEditHistoryService editHistory) : base(messenger)
+     {
++        this.editHistory = editHistory;
+         controller = new ToolActivationController<StandardTool>(coordinator, OnActivate, OnDeactivate);
+         BuildTools(registry);
+ 
+@@ -41,7 +46,13 @@ public partial class ToolbarControlViewModel : ObservableRecipient,
+         foreach (var descriptor in registry.GetTools(ToolbarId.Standard))
+         {
+             var tool = (StandardTool)descriptor.Tool;
+-            var startsEnabled = tool != StandardTool.PreviousView && tool != StandardTool.NextView;
++            // The view history and the edit history both start empty, so their buttons start
++            // disabled and are enabled by the message each history sends.
++            var startsEnabled =
++                tool != StandardTool.PreviousView
++                && tool != StandardTool.NextView
++                && tool != StandardTool.Undo
++                && tool != StandardTool.Redo;
+ 
+             controller.Tools.Add(new IconButtonControlViewModel<StandardTool>(
+                 tool,
+@@ -60,9 +71,12 @@ public partial class ToolbarControlViewModel : ObservableRecipient,
+     // Cross-toolbar deactivation now runs through the coordinator, the StandardToolsInUseMessage
+     // broadcast is kept only for non-toolbar consumers (the information panel and the AOI control)
+     // that react to a standard tool being used.
+-    private Task OnActivate(StandardTool tool)
++    private async Task OnActivate(StandardTool tool)
+     {
+-        if (tool != StandardTool.PreviousView && tool != StandardTool.NextView)
++        if (tool != StandardTool.PreviousView
++            && tool != StandardTool.NextView
++            && tool != StandardTool.Undo
++            && tool != StandardTool.Redo)
+         {
+             Messenger.Send<StandardToolsInUseMessage>();
+         }
+@@ -91,8 +105,14 @@ public partial class ToolbarControlViewModel : ObservableRecipient,
+         {
+             Messenger.Send(new MapViewNavigationToolMessage(MapViewType.NextView));
+         }
+-
+-        return Task.CompletedTask;
++        else if (tool == StandardTool.Undo)
++        {
++            await editHistory.UndoAsync();
++        }
++        else if (tool == StandardTool.Redo)
++        {
++            await editHistory.RedoAsync();
++        }
+     }
+ 
+     private Task OnDeactivate()
+@@ -111,6 +131,12 @@ public partial class ToolbarControlViewModel : ObservableRecipient,
+         SetEnabled(StandardTool.NextView, message.IsNextEnabled);
+     }
+ 
++    public void Receive(EditHistoryChangedMessage message)
++    {
++        SetEnabled(StandardTool.Undo, message.CanUndo);
++        SetEnabled(StandardTool.Redo, message.CanRedo);
++    }
++
+     private void SetEnabled(StandardTool tool, bool isEnabled)
+     {
+         var button = Tools.FirstOrDefault(t => t.Tool == tool);
+diff --git a/Src/MiEditor.MainApp/appsettings.json b/Src/MiEditor.MainApp/appsettings.json
+index 593c2c9..ba4d9e4 100644
+--- a/Src/MiEditor.MainApp/appsettings.json
++++ b/Src/MiEditor.MainApp/appsettings.json
+@@ -212,6 +212,10 @@
+     "MapViewsInfo": {
+       "MaxViewsHistory": 10
+     },
++    "EditHistory": {
++      "MaxUndoDepth": 10,
++      "MaxTotalBytes": 67108864
++    },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+     "LpisPolyIdBufferDistanceMeters": -0.01
+diff --git a/Src/MiEditor.MainApp/appsettings.Dev.json b/Src/MiEditor.MainApp/appsettings.Dev.json
+index 9c82273..a4e58fb 100644
+--- a/Src/MiEditor.MainApp/appsettings.Dev.json
++++ b/Src/MiEditor.MainApp/appsettings.Dev.json
+@@ -212,6 +212,10 @@
+     "MapViewsInfo": {
+       "MaxViewsHistory": 10
+     },
++    "EditHistory": {
++      "MaxUndoDepth": 10,
++      "MaxTotalBytes": 67108864
++    },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+     "LpisPolyIdBufferDistanceMeters":-0.01
+diff --git a/Src/MiEditor.MainApp/appsettings.PP.json b/Src/MiEditor.MainApp/appsettings.PP.json
+index 88e1c99..58ba2d8 100644
+--- a/Src/MiEditor.MainApp/appsettings.PP.json
++++ b/Src/MiEditor.MainApp/appsettings.PP.json
+@@ -212,6 +212,10 @@
+     "MapViewsInfo": {
+       "MaxViewsHistory": 10
+     },
++    "EditHistory": {
++      "MaxUndoDepth": 10,
++      "MaxTotalBytes": 67108864
++    },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+     "LpisPolyIdBufferDistanceMeters":-0.01
+diff --git a/Src/MiEditor.MainApp/appsettings.Sys.json b/Src/MiEditor.MainApp/appsettings.Sys.json
+index 43be536..1acd1a3 100644
+--- a/Src/MiEditor.MainApp/appsettings.Sys.json
++++ b/Src/MiEditor.MainApp/appsettings.Sys.json
+@@ -212,6 +212,10 @@
+     "MapViewsInfo": {
+       "MaxViewsHistory": 10
+     },
++    "EditHistory": {
++      "MaxUndoDepth": 10,
++      "MaxTotalBytes": 67108864
++    },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+     "LpisPolyIdBufferDistanceMeters":-0.01
+diff --git a/Src/MiEditor.MainApp/appsettings.UAT.json b/Src/MiEditor.MainApp/appsettings.UAT.json
+index fb1b820..b1e50b6 100644
+--- a/Src/MiEditor.MainApp/appsettings.UAT.json
++++ b/Src/MiEditor.MainApp/appsettings.UAT.json
+@@ -212,6 +212,10 @@
+     "MapViewsInfo": {
+       "MaxViewsHistory": 10
+     },
++    "EditHistory": {
++      "MaxUndoDepth": 10,
++      "MaxTotalBytes": 67108864
++    },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+     "LpisPolyIdBufferDistanceMeters":-0.01
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarControlViewModelTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarControlViewModelTests.cs
+index 279f44c..748fe3a 100644
+--- a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarControlViewModelTests.cs
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarControlViewModelTests.cs
+@@ -1,5 +1,6 @@
+ 
+ using CommunityToolkit.Mvvm.Messaging;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar.Activation;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar.Descriptors;
+@@ -16,6 +17,7 @@ public class ToolbarControlViewModelTests
+ {
+     private readonly StrongReferenceMessenger messenger = new();
+     private readonly ToolActivationCoordinator coordinator = new();
++    private readonly FakeEditHistoryService editHistory = new();
+     private readonly ToolbarControlViewModel sut;
+ 
+     public ToolbarControlViewModelTests()
+@@ -27,10 +29,12 @@ public class ToolbarControlViewModelTests
+             new InfoToolDescriptor(),
+             new RefreshToolDescriptor(),
+             new PreviousViewToolDescriptor(),
+-            new NextViewToolDescriptor()
++            new NextViewToolDescriptor(),
++            new UndoToolDescriptor(),
++            new RedoToolDescriptor()
+         ]);
+ 
+-        sut = new ToolbarControlViewModel(messenger, coordinator, registry);
++        sut = new ToolbarControlViewModel(messenger, coordinator, registry, editHistory);
+     }
+ 
+     private IconButtonControlViewModel<StandardTool> Button(StandardTool tool) =>
+@@ -46,7 +50,8 @@ public class ToolbarControlViewModelTests
+         Assert.Equal(
+             [
+                 StandardTool.Plus, StandardTool.Minus, StandardTool.Info,
+-                StandardTool.Refresh, StandardTool.PreviousView, StandardTool.NextView
++                StandardTool.Refresh, StandardTool.PreviousView, StandardTool.NextView,
++                StandardTool.Undo, StandardTool.Redo
+             ],
+             sut.Tools.Select(t => t.Tool));
+     }
+@@ -212,4 +217,82 @@ public class ToolbarControlViewModelTests
+         Assert.True(Button(StandardTool.PreviousView).IsEnabled);
+         Assert.False(Button(StandardTool.NextView).IsEnabled);
+     }
++
++    [Fact]
++    public void UndoAndRedoStartDisabled()
++    {
++        Assert.False(Button(StandardTool.Undo).IsEnabled);
++        Assert.False(Button(StandardTool.Redo).IsEnabled);
++    }
++
++    [Fact]
++    public void Undo_AsksTheEditHistoryToUndo()
++    {
++        Click(StandardTool.Undo);
++
++        Assert.Equal(1, editHistory.UndoCalls);
++        Assert.Equal(0, editHistory.RedoCalls);
++    }
++
++    [Fact]
++    public void Redo_AsksTheEditHistoryToRedo()
++    {
++        Click(StandardTool.Redo);
++
++        Assert.Equal(1, editHistory.RedoCalls);
++        Assert.Equal(0, editHistory.UndoCalls);
++    }
++
++    [Fact]
++    public void UndoAndRedo_DoNotBridgeStandardToolsInUse()
++    {
++        // The same rule the view history buttons follow: using them must not disturb the
++        // active Info mode or the AOI control.
++        var bridged = false;
++        messenger.Register<StandardToolsInUseMessage>(this, (_, _) => bridged = true);
++
++        Click(StandardTool.Undo);
++        Click(StandardTool.Redo);
++
++        Assert.False(bridged);
++    }
++
++    [Fact]
++    public void EditHistoryChangedMessage_DrivesTheUndoAndRedoButtons()
++    {
++        sut.Receive(new EditHistoryChangedMessage(CanUndo: true, CanRedo: false));
++
++        Assert.True(Button(StandardTool.Undo).IsEnabled);
++        Assert.False(Button(StandardTool.Redo).IsEnabled);
++
++        sut.Receive(new EditHistoryChangedMessage(CanUndo: false, CanRedo: true));
++
++        Assert.False(Button(StandardTool.Undo).IsEnabled);
++        Assert.True(Button(StandardTool.Redo).IsEnabled);
++    }
++
++    [Fact]
++    public void EditHistoryChangedMessage_LeavesTheViewHistoryButtonsAlone()
++    {
++        sut.Receive(new MapViewNavigationButtonsEnabledMessage(IsPrevEnabled: true, IsNextEnabled: true));
++
++        sut.Receive(new EditHistoryChangedMessage(CanUndo: false, CanRedo: false));
++
++        Assert.True(Button(StandardTool.PreviousView).IsEnabled);
++        Assert.True(Button(StandardTool.NextView).IsEnabled);
++    }
++
++    private sealed class FakeEditHistoryService : IEditHistoryService
++    {
++        public int UndoCalls { get; private set; }
++        public int RedoCalls { get; private set; }
++        public int ClearCalls { get; private set; }
++
++        public bool CanUndo { get; set; }
++        public bool CanRedo { get; set; }
++
++        public Task UndoAsync() { UndoCalls++; return Task.CompletedTask; }
++        public Task RedoAsync() { RedoCalls++; return Task.CompletedTask; }
++        public void ClearHistory() => ClearCalls++;
++    }
+ }
