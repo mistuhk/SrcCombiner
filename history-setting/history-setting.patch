@@ -1,0 +1,998 @@
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/Applying/EditHistoryService.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/Applying/EditHistoryService.cs
+index 1154131..5731d19 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/History/Applying/EditHistoryService.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/Applying/EditHistoryService.cs
+@@ -51,6 +51,7 @@ public sealed class EditHistoryService : IEditHistoryService
+     private readonly IEditConflictDetector conflictDetector;
+     private readonly IFeatureChangeApplier applier;
+     private readonly IEditSelectionClearer selectionClearer;
++    private readonly IEditHistorySwitch historySwitch;
+     private readonly IOperationFeedbackService feedback;
+     private readonly ICaseContext caseContext;
+     private readonly IMessenger messenger;
+@@ -67,6 +68,7 @@ public sealed class EditHistoryService : IEditHistoryService
+         IEditConflictDetector conflictDetector,
+         IFeatureChangeApplier applier,
+         IEditSelectionClearer selectionClearer,
++        IEditHistorySwitch historySwitch,
+         IOperationFeedbackService feedback,
+         ICaseContext caseContext,
+         IMessenger messenger,
+@@ -77,6 +79,7 @@ public sealed class EditHistoryService : IEditHistoryService
+         this.conflictDetector = conflictDetector;
+         this.applier = applier;
+         this.selectionClearer = selectionClearer;
++        this.historySwitch = historySwitch;
+         this.feedback = feedback;
+         this.caseContext = caseContext;
+         this.messenger = messenger;
+@@ -84,6 +87,11 @@ public sealed class EditHistoryService : IEditHistoryService
+ 
+         journal.Changed += OnJournalChanged;
+ 
++        // Switching the feature off discards what was recorded. Keeping it would offer, on a later
++        // switch back on, an undo of operations the officer may have built on since, with only the
++        // conflict check between them and a surprise.
++        historySwitch.Changed += OnSwitchChanged;
++
+         // History is scoped to a single case. Clearing on each case change is the primary
+         // safeguard; the case key recorded with each entry is a fallback for a missed event.
+         messenger.Register<EditHistoryService, SelectedCaseMessage>(this, (r, _) => r.ClearHistory());
+@@ -92,9 +100,9 @@ public sealed class EditHistoryService : IEditHistoryService
+         messenger.Register<EditHistoryService, ExitCaseMessage>(this, (r, _) => r.ClearHistory());
+     }
+ 
+-    public bool CanUndo => journal.CanUndo;
++    public bool CanUndo => historySwitch.IsEnabled && journal.CanUndo;
+ 
+-    public bool CanRedo => journal.CanRedo;
++    public bool CanRedo => historySwitch.IsEnabled && journal.CanRedo;
+ 
+     public Task UndoAsync() => RunAsync(EditHistoryDirection.Undo);
+ 
+@@ -109,6 +117,13 @@ public sealed class EditHistoryService : IEditHistoryService
+             return;
+         }
+ 
++        // Refused rather than relied on the buttons being hidden, so that a keyboard shortcut added
++        // later cannot leave the feature live while it looks switched off.
++        if (!historySwitch.IsEnabled)
++        {
++            return;
++        }
++
+         running = true;
+ 
+         try
+@@ -232,6 +247,14 @@ public sealed class EditHistoryService : IEditHistoryService
+     private static string Past(EditHistoryDirection direction) =>
+         direction == EditHistoryDirection.Undo ? "Undone" : "Redone";
+ 
++    private void OnSwitchChanged(object? sender, EventArgs e)
++    {
++        if (!historySwitch.IsEnabled)
++        {
++            ClearHistory();
++        }
++    }
++
+     private void OnJournalChanged(object? sender, EventArgs e) =>
+         messenger.Send(new EditHistoryChangedMessage(journal.CanUndo, journal.CanRedo));
+ }
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistorySwitch.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistorySwitch.cs
+new file mode 100644
+index 0000000..9be81cb
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/EditHistorySwitch.cs
+@@ -0,0 +1,106 @@
++using System.ComponentModel;
++using WG.MiEditor.Core.Services.UserPreferences;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Configuration.AppSettings;
++
++namespace WG.MiEditor.Core.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Whether the edit history is in use at all.
++/// <para>
++/// Lives at the root of the History folder rather than in one of its phases because it governs all of
++/// them: recording consults it before capturing anything, the service before applying anything, and the
++/// editing toolbar before showing the buttons.
++/// </para>
++/// </summary>
++public interface IEditHistorySwitch
++{
++    /// <summary>Whether undo and redo are on, for this deployment and this user.</summary>
++    bool IsEnabled { get; }
++
++    /// <summary>
++    /// Whether this deployment offers the feature at all. Separate from IsEnabled because the settings
++    /// panel needs it: with the feature withdrawn there is no choice to offer, so the History section is
++    /// not shown rather than shown with a switch that does nothing.
++    /// </summary>
++    bool IsAvailable { get; }
++
++    /// <summary>
++    /// Raised when the answer actually changes. Not raised when the user toggles their preference while
++    /// the deployment has the feature unavailable, because the answer was, and remains, no.
++    /// </summary>
++    event EventHandler? Changed;
++}
++
++/// <summary>
++/// Combines the two answers that decide whether the edit history is in use: whether this deployment
++/// offers the feature, and whether this user wants it.
++/// <para>
++/// The deployment answer wins. A switch a user could override would not be a switch, and the reason for
++/// having one is to be able to withdraw the feature estate wide without shipping new binaries, whether
++/// during a rollout or because an undo posts a visible compensating edit that an audit may object to.
++/// The user's stored preference is read, never written, so withdrawing the feature does not erase the
++/// choice they had made and it comes back if the feature is offered again.
++/// </para>
++/// </summary>
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IEditHistorySwitch) })]
++public sealed class EditHistorySwitch : IEditHistorySwitch
++{
++    private readonly EditHistoryInfo settings;
++    private readonly IUserPreferenceService preferences;
++
++    // What was last reported, so a preference change that cannot alter the answer stays silent.
++    private bool reported;
++
++    public EditHistorySwitch(
++        EditHistoryInfo settings,
++        IUserPreferenceService preferences,
++        ILoggerService loggerService)
++    {
++        this.settings = settings;
++        this.preferences = preferences;
++
++        if (!settings.Available)
++        {
++            // Said once at startup, because "undo has disappeared" otherwise arrives as a support call
++            // with nothing to point at.
++            loggerService.Info(
++                "Edit history: EditHistory.Available is false, so undo and redo are withdrawn in this deployment. "
++                + "Nothing is recorded and the setting is not offered.");
++        }
++
++        reported = IsEnabled;
++
++        // Both this and the preference service are singletons with the same lifetime, so there is
++        // nothing to unsubscribe from and no leak to manage.
++        preferences.PropertyChanged += OnPreferenceChanged;
++    }
++
++    /// <summary>
++    /// Available in this deployment, and wanted by this user.
++    /// </summary>
++    public bool IsEnabled => IsAvailable && preferences.HistoryEnabled;
++
++    public bool IsAvailable => settings.Available;
++
++    public event EventHandler? Changed;
++
++    private void OnPreferenceChanged(object? sender, PropertyChangedEventArgs e)
++    {
++        if (e.PropertyName != nameof(IUserPreferenceService.HistoryEnabled))
++        {
++            return;
++        }
++
++        var current = IsEnabled;
++
++        if (current == reported)
++        {
++            return;
++        }
++
++        reported = current;
++        Changed?.Invoke(this, EventArgs.Empty);
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/History/Recording/EditOperationRecorder.cs b/Src/MiEditor.Core/Services/Drawing/Editing/History/Recording/EditOperationRecorder.cs
+index 59f6676..a7aaa4d 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/History/Recording/EditOperationRecorder.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/History/Recording/EditOperationRecorder.cs
+@@ -41,10 +41,38 @@ public sealed partial class EditOperationRecorder(
+     IFeatureStateReader stateReader,
+     ICaseContext caseContext,
+     IOperationFeedbackService feedback,
+-    ILoggerService loggerService) : IEditOperationRecorder
++    ILoggerService loggerService,
++    IEditHistorySwitch historySwitch) : IEditOperationRecorder
+ {
++    /// <summary>
++    /// With the history switched off this hands back a scope that does nothing, so a caller's three
++    /// recording lines stay exactly as they are and cost nothing: no snapshots taken, no rows read back
++    /// from the service, nothing held in memory.
++    /// </summary>
+     public IEditOperationScope Begin(string operationName) =>
+-        new EditOperationScope(journal, snapshotFactory, stateReader, caseContext, feedback, loggerService, operationName);
++        historySwitch.IsEnabled
++            ? new EditOperationScope(journal, snapshotFactory, stateReader, caseContext, feedback, loggerService, operationName)
++            : DiscardingScope.Instance;
++
++    /// <summary>
++    /// What Begin hands back when the history is off. Stateless, so one instance serves every caller.
++    /// </summary>
++    private sealed class DiscardingScope : IEditOperationScope
++    {
++        public static readonly DiscardingScope Instance = new();
++
++        public void MarkInsert(string layerName, Feature feature) { }
++
++        public void ResolveInsertedObjectIds(string layerName, IReadOnlyList<AppliedEdit> applied) { }
++
++        public Task CaptureUpdateBeforeAsync(string layerName, Feature feature) => Task.CompletedTask;
++
++        public Task CaptureDeleteAsync(string layerName, Feature feature) => Task.CompletedTask;
++
++        public Task CommitAsync() => Task.CompletedTask;
++
++        public void Dispose() { }
++    }
+ 
+     private sealed partial class EditOperationScope(
+         IEditHistoryJournal journal,
+diff --git a/Src/MiEditor.Core/Services/UserPreferences/IUserPreferenceService.cs b/Src/MiEditor.Core/Services/UserPreferences/IUserPreferenceService.cs
+index 3fc34f4..6178f5d 100644
+--- a/Src/MiEditor.Core/Services/UserPreferences/IUserPreferenceService.cs
++++ b/Src/MiEditor.Core/Services/UserPreferences/IUserPreferenceService.cs
+@@ -20,4 +20,13 @@ public interface IUserPreferenceService : INotifyPropertyChanged
+     /// </summary>
+     AppThemeChoice ThemeChoice { get; set; }
+ 
++    /// <summary>
++    /// Gets or sets a value indicating whether the user wants undo and redo.
++    /// <para>
++    /// Off by default. Read together with EditHistoryInfo.Available, which can withdraw the feature for
++    /// the whole deployment and takes precedence; see IEditHistorySwitch, which is what everything else
++    /// consults rather than reading either of these directly.
++    /// </para>
++    /// </summary>
++    bool HistoryEnabled { get; set; }
+ }
+diff --git a/Src/MiEditor.Core/Services/UserPreferences/UserPreferenceService.cs b/Src/MiEditor.Core/Services/UserPreferences/UserPreferenceService.cs
+index 97148ee..87fe57e 100644
+--- a/Src/MiEditor.Core/Services/UserPreferences/UserPreferenceService.cs
++++ b/Src/MiEditor.Core/Services/UserPreferences/UserPreferenceService.cs
+@@ -16,15 +16,21 @@ public partial class UserPreferenceService : ObservableObject, IUserPreferenceSe
+     [ObservableProperty]
+     private AppThemeChoice themeChoice;
+ 
++    [ObservableProperty]
++    private bool historyEnabled;
++
+     public UserPreferenceService(IPreferences preferences)
+     {
+         this.preferences = preferences;
+ 
+         ShowFeatureGuide = preferences.Get(nameof(ShowFeatureGuide), true);
+         ThemeChoice = (AppThemeChoice)preferences.Get(nameof(ThemeChoice), (int)AppThemeChoice.Auto);
++        HistoryEnabled = preferences.Get(nameof(HistoryEnabled), false);
+     }
+ 
+     partial void OnShowFeatureGuideChanged(bool value) => preferences.Set(nameof(ShowFeatureGuide), value);
+ 
+     partial void OnThemeChoiceChanged(AppThemeChoice value) => preferences.Set(nameof(ThemeChoice), (int)value);
++
++    partial void OnHistoryEnabledChanged(bool value) => preferences.Set(nameof(HistoryEnabled), value);
+ }
+diff --git a/Src/MiEditor.MainApp/AutoScanning.cs b/Src/MiEditor.MainApp/AutoScanning.cs
+index 500f4a4..3c04de9 100644
+--- a/Src/MiEditor.MainApp/AutoScanning.cs
++++ b/Src/MiEditor.MainApp/AutoScanning.cs
+@@ -8,6 +8,7 @@ using WG.MiEditor.Configuration.AppSettings;
+ using WG.MiEditor.Core.Services;
+ using WG.MiEditor.Core.Services.Drawing.Editing;
+ using WG.MiEditor.Core.Services.Drawing.Editing.AddFeatures.Manager;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.Core.Services.Drawing.Editing.History.Applying;
+ using WG.MiEditor.Core.Services.Drawing.Editing.Managers;
+ using WG.MiEditor.Core.Services.Drawing.Editing.MergeFeature.Operation;
+@@ -120,6 +121,7 @@ public static class AutoScanning
+             sp.GetRequiredService<IToolActivationCoordinator>(),
+             sp.GetRequiredService<IToolDescriptorRegistry>(),
+             sp.GetRequiredService<IEditHistoryService>(),
++            sp.GetRequiredService<IEditHistorySwitch>(),
+             sp.GetRequiredService<ApplicationSettings>()));
+ 
+         services.AddSingleton(sp => new AoiToolbarControlViewModel(
+diff --git a/Src/MiEditor.MainApp/Controls/Settings/SettingsSidebarControl.xaml b/Src/MiEditor.MainApp/Controls/Settings/SettingsSidebarControl.xaml
+index 9cff0a3..1afb442 100644
+--- a/Src/MiEditor.MainApp/Controls/Settings/SettingsSidebarControl.xaml
++++ b/Src/MiEditor.MainApp/Controls/Settings/SettingsSidebarControl.xaml
+@@ -177,7 +177,49 @@
+                 </Border>
+ 
+                 <!-- Editing settings: shown during an edit session -->
+-                <VerticalStackLayout IsVisible="{Binding IsSnappingSettingsVisible}" Spacing="8">
++                <VerticalStackLayout IsVisible="{Binding IsEditingSettingsVisible}" Spacing="8">
++
++                    <!-- History Settings: also hidden when the deployment has withdrawn the feature -->
++                    <Border Style="{StaticResource SettingsCardStyle}"
++                            IsVisible="{Binding IsHistoryAvailable}"
++                            Shadow="{AppThemeBinding Light={StaticResource BorderShadowStyle}, Dark={StaticResource BorderShadowStyle}}">
++                        <VerticalStackLayout Spacing="5">
++                            <Grid ColumnDefinitions="*,Auto" Padding="0,5">
++                                <Grid.GestureRecognizers>
++                                    <TapGestureRecognizer Command="{Binding ToggleHistoryCommand}" />
++                                </Grid.GestureRecognizers>
++                                <Label Grid.Column="0" Text="History" Style="{StaticResource SettingsCardTitleStyle}" />
++                                <Label Grid.Column="1" Style="{StaticResource SettingsCardChevronStyle}">
++                                    <Label.Triggers>
++                                        <DataTrigger TargetType="Label" Binding="{Binding IsHistoryExpanded}" Value="False">
++                                            <Setter Property="Rotation" Value="-90" />
++                                        </DataTrigger>
++                                    </Label.Triggers>
++                                </Label>
++                            </Grid>
++
++                            <VerticalStackLayout IsVisible="{Binding IsHistoryExpanded}" Spacing="5">
++
++                                <HorizontalStackLayout>
++                                    <Label Text="Enable Undo and Redo"
++                                           FontSize="{StaticResource FontSizeSubHeader}"
++                                           TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
++                                           VerticalOptions="Center"
++                                           WidthRequest="180"/>
++
++                                    <Switch IsToggled="{Binding IsHistoryEnabled}"
++                                            VerticalOptions="Center"
++                                            HorizontalOptions="End" />
++
++                                </HorizontalStackLayout>
++
++                                <Label Text="Turning this off clears what has been recorded."
++                                       FontSize="12"
++                                       TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}" />
++
++                            </VerticalStackLayout>
++                        </VerticalStackLayout>
++                    </Border>
+ 
+                     <!-- Snapping Settings -->
+                     <Border Style="{StaticResource SettingsCardStyle}"
+diff --git a/Src/MiEditor.MainApp/ViewModels/Settings/SettingsSidebarControlViewModel.cs b/Src/MiEditor.MainApp/ViewModels/Settings/SettingsSidebarControlViewModel.cs
+index abd04c5..bcb0bda 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Settings/SettingsSidebarControlViewModel.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Settings/SettingsSidebarControlViewModel.cs
+@@ -10,6 +10,7 @@ using WG.MiEditor.Core.Services;
+ using WG.MiEditor.Core.Services.Drawing.Editing;
+ using WG.MiEditor.Core.Services.Drawing.Editing.SplitFeature;
+ using WG.MiEditor.Core.Services.MapData;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.Core.Services.Themes;
+ using WG.MiEditor.Core.Services.UserPreferences;
+ using WG.MiEditor.Messages.CaseManagement;
+@@ -56,6 +57,7 @@ public partial class SettingsSidebarControlViewModel
+         ISplitOverlapSettingsService splitOverlapSettingsService,
+         ILpisSettingsService lpisSettingsService,
+         IThemeService themeService,
++        IEditHistorySwitch historySwitch,
+         Layers layers)
+         : base(messenger)
+     {
+@@ -68,6 +70,11 @@ public partial class SettingsSidebarControlViewModel
+         this.themeService = themeService;
+         this.themeService.ThemeChanged += OnThemeChanged;
+ 
++        // The deployment can withdraw the feature, in which case there is no choice to offer and the
++        // section is left out rather than shown with a switch that cannot do anything.
++        IsHistoryAvailable = historySwitch.IsAvailable;
++        IsHistoryEnabled = preferences.HistoryEnabled;
++
+         this.Preferences = preferences;
+         this.BufferSettingsService = bufferSettingsService;
+         this.OverlapSettingsService = splitOverlapSettingsService;
+@@ -100,14 +107,38 @@ public partial class SettingsSidebarControlViewModel
+     [ObservableProperty]
+     private bool isThemeExpanded = true;
+ 
++    [ObservableProperty]
++    private bool isHistoryExpanded = true;
++
++    /// <summary>Whether this deployment offers undo and redo at all. Hides the whole section when not.</summary>
++    [ObservableProperty]
++    private bool isHistoryAvailable;
++
++    /// <summary>The user's own choice, written straight through to the stored preference.</summary>
++    [ObservableProperty]
++    private bool isHistoryEnabled;
++
++    partial void OnIsHistoryEnabledChanged(bool value) => Preferences.HistoryEnabled = value;
++
++    [RelayCommand]
++    private void ToggleHistory()
++    {
++        IsHistoryExpanded = !IsHistoryExpanded;
++    }
++
+     partial void OnIsSnappingEnabledChanged(bool value)
+     {
+         HandleSnappingToggle(value);
+     }
+ 
+ 
++    /// <summary>
++    /// Whether the editing sections are shown, which is every section below Theme: History, Snapping,
++    /// Guide, Buffer, Split overlap and LPIS transparency. They are available during an edit session
++    /// only. Named for snapping until the History section was added beneath the same gate.
++    /// </summary>
+     [ObservableProperty]
+-    private bool isSnappingSettingsVisible;
++    private bool isEditingSettingsVisible;
+ 
+     [ObservableProperty]
+     private bool isSnappingEnabled;
+@@ -372,7 +403,7 @@ public partial class SettingsSidebarControlViewModel
+     public void Receive(ExitCaseMessage message)
+     {
+         IsStartEditingOn = false;
+-        IsSnappingSettingsVisible = false;
++        IsEditingSettingsVisible = false;
+         this.Messenger.Send(new ToggleSnapSettingMessage(false));
+     }
+ 
+@@ -388,7 +419,7 @@ public partial class SettingsSidebarControlViewModel
+ 
+         if (IsStartEditingOn)
+         {
+-            IsSnappingSettingsVisible = true;
++            IsEditingSettingsVisible = true;
+             this.Messenger.Send(new ToggleSnapSettingMessage(true));
+         }
+     }
+@@ -405,7 +436,7 @@ public partial class SettingsSidebarControlViewModel
+         OptionalLayers.Clear();
+         DefaultLayers.Clear();
+ 
+-        IsSnappingSettingsVisible = true;
++        IsEditingSettingsVisible = true;
+         this.Messenger.Send(new ToggleSnapSettingMessage(true));
+ 
+         var map = await this.mapService.GetMapAsync();
+diff --git a/Src/MiEditor.MainApp/ViewModels/Toolbar/EditingLayerToolbarViewModel.cs b/Src/MiEditor.MainApp/ViewModels/Toolbar/EditingLayerToolbarViewModel.cs
+index 4c8a3dd..e9279e5 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Toolbar/EditingLayerToolbarViewModel.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Toolbar/EditingLayerToolbarViewModel.cs
+@@ -5,6 +5,7 @@ using Esri.ArcGISRuntime.Geometry;
+ using WG.MiEditor.Configuration.AppSettings;
+ using WG.MiEditor.Core.Services;
+ using WG.MiEditor.Core.Services.Drawing.Editing;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.Core.Services.Drawing.Editing.History.Applying;
+ using WG.MiEditor.Core.Services.Drawing.Editing.Managers;
+ using WG.MiEditor.Core.Services.Drawing.Editing.MergeFeature.Operation;
+@@ -37,6 +38,7 @@ public partial class EditingLayerToolbarViewModel : ObservableRecipient,
+     IRecipient<EditHistoryChangedMessage>,
+     IRecipient<ResetToolbarState>
+ {
++    private readonly IEditHistorySwitch historySwitch;
+     private readonly IEditingOperationsManager editingOperationsManager;
+     private readonly IFeatureLayerService featureLayerService;
+     private readonly IMergeFeatureService mergeFeatureService;
+@@ -68,6 +70,7 @@ public partial class EditingLayerToolbarViewModel : ObservableRecipient,
+         IToolActivationCoordinator coordinator,
+         IToolDescriptorRegistry registry,
+         IEditHistoryService editHistory,
++        IEditHistorySwitch historySwitch,
+         ApplicationSettings applicationSettings)
+         : base(messenger)
+     {
+@@ -82,9 +85,15 @@ public partial class EditingLayerToolbarViewModel : ObservableRecipient,
+         this.editHistory = editHistory;
+         this.applicationSettings = applicationSettings;
+ 
++        this.historySwitch = historySwitch;
++
+         controller = new ToolActivationController<EditingTool>(coordinator, OnActivate, OnDeactivate);
+         BuildTools(registry);
+ 
++        // The setting can be turned off mid session, so the buttons follow it rather than being
++        // decided once at startup.
++        historySwitch.Changed += (_, _) => ApplyHistoryVisibility();
++
+         IsVisible = false;
+         IsActive = true;
+     }
+@@ -96,13 +105,15 @@ public partial class EditingLayerToolbarViewModel : ObservableRecipient,
+         foreach (var descriptor in registry.GetTools(ToolbarId.Editing))
+         {
+             var tool = (EditingTool)descriptor.Tool;
+-            var startsEnabled = tool != EditingTool.Undo && tool != EditingTool.Redo;
++            var isHistoryTool = tool == EditingTool.Undo || tool == EditingTool.Redo;
++            var startsEnabled = !isHistoryTool;
+ 
+             controller.Tools.Add(new IconButtonControlViewModel<EditingTool>(
+                 (EditingTool)descriptor.Tool,
+                 descriptor.Icon,
+                 controller.HandleSelected,
+                 isEnabled: startsEnabled,
++                isVisible: !isHistoryTool || historySwitch.IsEnabled,
+                 activation: descriptor.Activation)
+             {
+                 ToolTip = descriptor.Tooltip
+@@ -275,6 +286,27 @@ public partial class EditingLayerToolbarViewModel : ObservableRecipient,
+         SetEnabled(EditingTool.Redo, message.CanRedo);
+     }
+ 
++    /// <summary>
++    /// Undo and redo are shown only while the history is in use. Hidden rather than disabled, so a
++    /// deployment or a user that has withdrawn the feature does not leave two dead buttons behind.
++    /// </summary>
++    private void ApplyHistoryVisibility()
++    {
++        var isVisible = historySwitch.IsEnabled;
++
++        SetVisible(EditingTool.Undo, isVisible);
++        SetVisible(EditingTool.Redo, isVisible);
++    }
++
++    private void SetVisible(EditingTool tool, bool isVisible)
++    {
++        var button = Tools.FirstOrDefault(t => t.Tool == tool);
++        if (button is not null)
++        {
++            button.IsVisible = isVisible;
++        }
++    }
++
+     private void SetEnabled(EditingTool tool, bool isEnabled)
+     {
+         var button = Tools.FirstOrDefault(t => t.Tool == tool);
+diff --git a/Src/MiEditor.MainApp/appsettings.Dev.json b/Src/MiEditor.MainApp/appsettings.Dev.json
+index ca88f0b..2127a1c 100644
+--- a/Src/MiEditor.MainApp/appsettings.Dev.json
++++ b/Src/MiEditor.MainApp/appsettings.Dev.json
+@@ -240,7 +240,8 @@
+     },
+     "EditHistory": {
+       "MaxUndoDepth": 10,
+-      "MaxTotalBytes": 67108864
++      "MaxTotalBytes": 67108864,
++      "Available": true
+     },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+diff --git a/Src/MiEditor.MainApp/appsettings.PP.json b/Src/MiEditor.MainApp/appsettings.PP.json
+index 0ba1c93..57f88b9 100644
+--- a/Src/MiEditor.MainApp/appsettings.PP.json
++++ b/Src/MiEditor.MainApp/appsettings.PP.json
+@@ -240,7 +240,8 @@
+     },
+     "EditHistory": {
+       "MaxUndoDepth": 10,
+-      "MaxTotalBytes": 67108864
++      "MaxTotalBytes": 67108864,
++      "Available": true
+     },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+diff --git a/Src/MiEditor.MainApp/appsettings.Sys.json b/Src/MiEditor.MainApp/appsettings.Sys.json
+index e6bc4df..2296f3c 100644
+--- a/Src/MiEditor.MainApp/appsettings.Sys.json
++++ b/Src/MiEditor.MainApp/appsettings.Sys.json
+@@ -240,7 +240,8 @@
+     },
+     "EditHistory": {
+       "MaxUndoDepth": 10,
+-      "MaxTotalBytes": 67108864
++      "MaxTotalBytes": 67108864,
++      "Available": true
+     },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+diff --git a/Src/MiEditor.MainApp/appsettings.UAT.json b/Src/MiEditor.MainApp/appsettings.UAT.json
+index 6b9a3c1..95918e2 100644
+--- a/Src/MiEditor.MainApp/appsettings.UAT.json
++++ b/Src/MiEditor.MainApp/appsettings.UAT.json
+@@ -240,7 +240,8 @@
+     },
+     "EditHistory": {
+       "MaxUndoDepth": 10,
+-      "MaxTotalBytes": 67108864
++      "MaxTotalBytes": 67108864,
++      "Available": true
+     },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+diff --git a/Src/MiEditor.MainApp/appsettings.json b/Src/MiEditor.MainApp/appsettings.json
+index 4980cbc..0ad61df 100644
+--- a/Src/MiEditor.MainApp/appsettings.json
++++ b/Src/MiEditor.MainApp/appsettings.json
+@@ -240,7 +240,8 @@
+     },
+     "EditHistory": {
+       "MaxUndoDepth": 10,
+-      "MaxTotalBytes": 67108864
++      "MaxTotalBytes": 67108864,
++      "Available": true
+     },
+     "MinTaAreaInHectares": 0.005,
+     "CoordinateZoomScale": 4999,
+diff --git a/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs b/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs
+index 7383ce1..579aa2d 100644
+--- a/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs
++++ b/Src/MiEditor.Shared/Configuration/AppSettings/EditHistoryInfo.cs
+@@ -5,5 +5,19 @@ namespace WG.MiEditor.Shared.Configuration.AppSettings;
+ /// Defines the limits applied to edit history. MaxUndoDepth caps the number of
+ /// retained operations, while MaxTotalBytes caps the combined size of the undo
+ /// and redo history. Oldest entries are evicted as needed to satisfy both.
++/// <para>
++/// Available says whether this deployment offers the feature at all. It is separate from the user's own
++/// setting and takes precedence over it: this is the estate wide withdrawal, and a user cannot turn the
++/// feature back on against it. Named Available rather than Enabled so that the combined check reads as
++/// what it means, available here and wanted by this user.
++/// </para>
++/// <para>
++/// It defaults to true so that an appsettings file written before this existed leaves the feature on
++/// offer. The user setting defaults to off, so the feature is still dark until somebody opts in, and
++/// this value only ever needs editing to withdraw the option altogether.
++/// </para>
+ /// </summary>
+-public record EditHistoryInfo(int MaxUndoDepth = 10, long MaxTotalBytes = 64L * 1024 * 1024);
++public record EditHistoryInfo(
++    int MaxUndoDepth = 10,
++    long MaxTotalBytes = 64L * 1024 * 1024,
++    bool Available = true);
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Applying/EditHistoryServiceTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Applying/EditHistoryServiceTests.cs
+index 23d292c..2a32e90 100644
+--- a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Applying/EditHistoryServiceTests.cs
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Applying/EditHistoryServiceTests.cs
+@@ -1,6 +1,7 @@
+ 
+ using CommunityToolkit.Mvvm.Messaging;
+ using Moq;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.Core.Services.Drawing.Editing.History.Applying;
+ using WG.MiEditor.Core.Services.Drawing.Editing.History.FeatureTables;
+ using WG.MiEditor.Core.Services.Drawing.Editing.History.Journal;
+@@ -28,6 +29,7 @@ public class EditHistoryServiceTests
+     private readonly Mock<IEditConflictDetector> detector = new();
+     private readonly Mock<IFeatureChangeApplier> applier = new();
+     private readonly Mock<IEditSelectionClearer> selectionClearer = new();
++    private readonly Mock<IEditHistorySwitch> historySwitch = new();
+     private readonly Mock<IOperationFeedbackService> feedback = new();
+ 
+     private readonly List<EditHistoryChangedMessage> published = [];
+@@ -36,6 +38,9 @@ public class EditHistoryServiceTests
+     /// <summary>The change lists handed to the applier, in order.</summary>
+     private readonly List<IReadOnlyList<FeatureChange>> applied = [];
+ 
++    /// <summary>The history is on unless a test says otherwise.</summary>
++    private bool historyEnabled = true;
++
+     private ConflictResult conflict = ConflictResult.None;
+     private IReadOnlyList<ObjectIdRemap> nextRemaps = [];
+     private ChangeApplyResult? nextResult;
+@@ -64,6 +69,7 @@ public class EditHistoryServiceTests
+             });
+ 
+         selectionClearer.Setup(c => c.ClearAsync()).Returns(Task.CompletedTask);
++        historySwitch.Setup(h => h.IsEnabled).Returns(() => historyEnabled);
+ 
+         // Undo and redo execute through RunAsync, so it must call the supplied delegate.
+         // Exceptions are not swallowed, as doing so would hide test failures.
+@@ -85,6 +91,7 @@ public class EditHistoryServiceTests
+             detector.Object, 
+             applier.Object, 
+             selectionClearer.Object,
++            historySwitch.Object,
+             feedback.Object, 
+             Mock.Of<ICaseContext>(c => c.CaseNo == OpenCase), 
+             messenger, 
+@@ -100,6 +107,54 @@ public class EditHistoryServiceTests
+         Assert.False(sut.CanRedo);
+     }
+ 
++    [Fact]
++    public async Task With_The_History_Off_An_Undo_Is_Refused()
++    {
++        // Refused rather than trusting the buttons to be hidden, so a keyboard shortcut added later
++        // cannot leave the feature live while it looks switched off.
++        journal.Record(CreateEntry());
++        historyEnabled = false;
++
++        await sut.UndoAsync();
++
++        Assert.Empty(applied);
++    }
++
++    [Fact]
++    public void With_The_History_Off_Nothing_Is_Offered_Even_With_Entries_Recorded()
++    {
++        journal.Record(CreateEntry());
++        historyEnabled = false;
++
++        Assert.False(sut.CanUndo);
++        Assert.False(sut.CanRedo);
++    }
++
++    [Fact]
++    public void Switching_The_History_Off_Discards_What_Was_Recorded()
++    {
++        // Keeping it would offer, on a later switch back on, an undo of operations the officer may have
++        // built on since.
++        journal.Record(CreateEntry());
++        journal.Record(CreateEntry());
++
++        historyEnabled = false;
++        historySwitch.Raise(h => h.Changed += null, EventArgs.Empty);
++
++        Assert.Equal(0, journal.UndoDepth);
++        Assert.Equal(0, journal.RedoDepth);
++    }
++
++    [Fact]
++    public void Switching_The_History_On_Discards_Nothing()
++    {
++        journal.Record(CreateEntry());
++
++        historySwitch.Raise(h => h.Changed += null, EventArgs.Empty);
++
++        Assert.Equal(1, journal.UndoDepth);
++    }
++
+     [Fact]
+     public void Recording_An_Operation_Tells_The_Toolbar_What_Is_Available()
+     {
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistorySwitchTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistorySwitchTests.cs
+new file mode 100644
+index 0000000..fba5b06
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/EditHistorySwitchTests.cs
+@@ -0,0 +1,172 @@
++using System.ComponentModel;
++using Moq;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
++using WG.MiEditor.Core.Services.UserPreferences;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Shared.Configuration.AppSettings;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History;
++
++/// <summary>
++/// Two answers decide whether the history is in use, and the deployment's answer wins. That precedence
++/// is the whole reason this type exists, so it is what these assert.
++/// </summary>
++public class EditHistorySwitchTests
++{
++    private readonly Mock<IUserPreferenceService> preferences = new();
++    private readonly Mock<ILoggerService> logger = new();
++
++    private bool wanted;
++
++    public EditHistorySwitchTests() =>
++        preferences.SetupGet(p => p.HistoryEnabled).Returns(() => wanted);
++
++    private EditHistorySwitch Create(bool available) =>
++        new(new EditHistoryInfo(Available: available), preferences.Object, logger.Object);
++
++    private void UserSets(bool value)
++    {
++        wanted = value;
++        preferences.Raise(
++            p => p.PropertyChanged += null,
++            new PropertyChangedEventArgs(nameof(IUserPreferenceService.HistoryEnabled)));
++    }
++
++    // ---------------------------------------------------------------- the four combinations
++
++    [Fact]
++    public void Available_And_Wanted_Is_On()
++    {
++        wanted = true;
++
++        Assert.True(Create(available: true).IsEnabled);
++    }
++
++    [Fact]
++    public void Available_But_Not_Wanted_Is_Off()
++    {
++        wanted = false;
++
++        Assert.False(Create(available: true).IsEnabled);
++    }
++
++    [Fact]
++    public void Withdrawn_Is_Off_Even_When_The_User_Wants_It()
++    {
++        // The point of the deployment switch. One a user could override would not be a switch.
++        wanted = true;
++
++        Assert.False(Create(available: false).IsEnabled);
++    }
++
++    [Fact]
++    public void Withdrawn_And_Not_Wanted_Is_Off()
++    {
++        wanted = false;
++
++        Assert.False(Create(available: false).IsEnabled);
++    }
++
++    [Fact]
++    public void Availability_Is_The_Deployment_Answer_Alone()
++    {
++        // What the settings panel asks, so it can leave the section out rather than show a switch that
++        // cannot do anything. Independent of what the user wants.
++        wanted = false;
++
++        Assert.True(Create(available: true).IsAvailable);
++        Assert.False(Create(available: false).IsAvailable);
++    }
++
++    // ---------------------------------------------------------------- when it reports a change
++
++    [Fact]
++    public void Wanting_It_Reports_A_Change_When_Available()
++    {
++        var sut = Create(available: true);
++        var changes = 0;
++        sut.Changed += (_, _) => changes++;
++
++        UserSets(true);
++
++        Assert.Equal(1, changes);
++        Assert.True(sut.IsEnabled);
++    }
++
++    [Fact]
++    public void No_Longer_Wanting_It_Reports_A_Change()
++    {
++        wanted = true;
++        var sut = Create(available: true);
++        var changes = 0;
++        sut.Changed += (_, _) => changes++;
++
++        UserSets(false);
++
++        Assert.Equal(1, changes);
++        Assert.False(sut.IsEnabled);
++    }
++
++    [Fact]
++    public void Wanting_It_Reports_Nothing_When_Withdrawn()
++    {
++        // The answer was no and remains no, so there is nothing to tell anyone. Reporting a change here
++        // would have the service clear a history it never had, on a switch that did not move.
++        var sut = Create(available: false);
++        var changes = 0;
++        sut.Changed += (_, _) => changes++;
++
++        UserSets(true);
++
++        Assert.Equal(0, changes);
++        Assert.False(sut.IsEnabled);
++    }
++
++    [Fact]
++    public void An_Unrelated_Preference_Change_Reports_Nothing()
++    {
++        var sut = Create(available: true);
++        var changes = 0;
++        sut.Changed += (_, _) => changes++;
++
++        wanted = true;
++        preferences.Raise(
++            p => p.PropertyChanged += null,
++            new PropertyChangedEventArgs(nameof(IUserPreferenceService.ThemeChoice)));
++
++        Assert.Equal(0, changes);
++    }
++
++    // ---------------------------------------------------------------- what it must not do
++
++    [Fact]
++    public void The_Users_Stored_Choice_Is_Read_And_Never_Written()
++    {
++        // Withdrawing the feature must not erase what the user had chosen, so that their choice returns
++        // if it is offered again.
++        wanted = true;
++        var sut = Create(available: false);
++
++        _ = sut.IsEnabled;
++        UserSets(true);
++
++        preferences.VerifySet(p => p.HistoryEnabled = It.IsAny<bool>(), Times.Never);
++    }
++
++    [Fact]
++    public void Withdrawing_The_Feature_Is_Said_Once_At_Startup()
++    {
++        // Otherwise "undo has disappeared" arrives as a support call with nothing to point at.
++        Create(available: false);
++
++        logger.Verify(l => l.Info(It.Is<string>(m => m.Contains("EditHistory.Available is false"))), Times.Once);
++    }
++
++    [Fact]
++    public void Offering_The_Feature_Says_Nothing()
++    {
++        Create(available: true);
++
++        logger.Verify(l => l.Info(It.IsAny<string>()), Times.Never);
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Recording/EditOperationRecorderTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Recording/EditOperationRecorderTests.cs
+index 7cd8b04..c92b121 100644
+--- a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Recording/EditOperationRecorderTests.cs
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Recording/EditOperationRecorderTests.cs
+@@ -1,6 +1,7 @@
+ 
+ using Esri.ArcGISRuntime.Data;
+ using Moq;
++using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.Core.Services.Drawing.Editing.History.FeatureTables;
+ using WG.MiEditor.Core.Services.Drawing.Editing.History.Journal;
+ using WG.MiEditor.Core.Services.Drawing.Editing.History.Model;
+@@ -28,6 +29,10 @@ public class EditOperationRecorderTests
+     private readonly Mock<IFeatureStateReader> stateReader = new();
+     private readonly Mock<IFeatureSnapshotFactory> snapshotFactory = new();
+     private readonly Mock<ILoggerService> logger = new();
++    private readonly Mock<IEditHistorySwitch> historySwitch = new();
++
++    /// <summary>The history is on unless a test says otherwise.</summary>
++    private bool historyEnabled = true;
+ 
+     private readonly EditOperationRecorder sut;
+ 
+@@ -44,6 +49,8 @@ public class EditOperationRecorderTests
+ 
+     public EditOperationRecorderTests()
+     {
++        historySwitch.Setup(h => h.IsEnabled).Returns(() => historyEnabled);
++
+         stateReader
+             .Setup(r => r.ReadAsync(It.IsAny<FeatureIdentity>()))
+             .ReturnsAsync((FeatureIdentity identity) =>
+@@ -61,7 +68,8 @@ public class EditOperationRecorderTests
+             stateReader.Object,
+             Mock.Of<ICaseContext>(c => c.CaseNo == CaseKey),
+             Mock.Of<IOperationFeedbackService>(),
+-            logger.Object);
++            logger.Object,
++            historySwitch.Object);
+     }
+ 
+     /// <summary>
+@@ -312,6 +320,36 @@ public class EditOperationRecorderTests
+         Assert.Equal([11, 22], journal.PeekUndo()!.Changes.Select(c => c.Identity.ObjectId));
+     }
+ 
++    [Fact]
++    public async Task With_The_History_Off_Nothing_Is_Recorded_And_Nothing_Is_Read()
++    {
++        // Not merely unrecorded: no snapshot taken and no row read back, because paying nothing for a
++        // feature that is switched off is the point of the switch.
++        historyEnabled = false;
++        using var scope = sut.Begin("Add Canopy Point");
++
++        scope.MarkInsert(Child, FeatureWith(517));
++        scope.ResolveInsertedObjectIds(Child, [Added(8842)]);
++        await scope.CommitAsync();
++
++        Assert.Equal(0, journal.UndoDepth);
++        Assert.Empty(asked);
++        snapshotFactory.Verify(f => f.ReadObjectId(It.IsAny<Feature>()), Times.Never);
++    }
++
++    [Fact]
++    public async Task With_The_History_Off_An_Update_Capture_Takes_No_Snapshot()
++    {
++        historyEnabled = false;
++        using var scope = sut.Begin("Edit Vertex");
++
++        await scope.CaptureUpdateBeforeAsync(Child, FeatureWithNoId());
++        await scope.CommitAsync();
++
++        Assert.Equal(0, journal.UndoDepth);
++        snapshotFactory.Verify(f => f.CreateAsync(It.IsAny<string>(), It.IsAny<Feature>()), Times.Never);
++    }
++
+     [Fact]
+     public void Each_Begin_Is_Independent()
+     {

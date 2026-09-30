@@ -1,0 +1,507 @@
+
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:WG.MiEditor.MainApp.ViewModels.Settings"
+             xmlns:app="clr-namepsace:WG.MiEditor.MainApp"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:local="clr-namespace:WG.MiEditor.MainApp.Converters"
+             xmlns:model="clr-namespace:WG.MiEditor.Shared.Models.Settings;assembly=MiEditor.Shared"
+             x:Class="WG.MiEditor.MainApp.Controls.Settings.SettingsSidebarControl"
+             x:DataType="vm:SettingsSidebarControlViewModel"
+             Style="{StaticResource SettingsSidebarContainerStyle}">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Panel header: title on the left, close on the right -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Padding="10,10,10,12">
+            <Label Grid.Column="0" Style="{StaticResource SettingsPanelTitleStyle}" />
+            <Label Grid.Column="1" Style="{StaticResource SettingsCloseButtonStyle}">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding CloseSidebarCommand}" />
+                </Label.GestureRecognizers>
+            </Label>
+        </Grid>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="8">
+
+                <!-- Theme section: always visible -->
+                <Border Style="{StaticResource SettingsCardStyle}"
+                        Shadow="{AppThemeBinding Light={StaticResource BorderShadowStyle}, Dark={StaticResource BorderShadowStyle}}">
+                    <VerticalStackLayout Spacing="5">
+                        <Grid ColumnDefinitions="*,Auto" Padding="0,5">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding ToggleThemeCommand}" />
+                            </Grid.GestureRecognizers>
+                            <Label Grid.Column="0" Text="Theme" Style="{StaticResource SettingsCardTitleStyle}" />
+                            <Label Grid.Column="1" Style="{StaticResource SettingsCardChevronStyle}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding IsThemeExpanded}" Value="False">
+                                        <Setter Property="Rotation" Value="-90" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </Grid>
+
+                        <VerticalStackLayout IsVisible="{Binding IsThemeExpanded}" Spacing="10">
+                            <Label TextType="Html" 
+                                   Text="Select your preferred theme. &lt;b&gt;Auto&lt;/b&gt; adopts Windows theme and updates instantly when it changes."
+                                   FontSize="12"
+                                   TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}" />
+
+                            <Border BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}"
+                                    Stroke="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}"
+                                    StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 9"
+                                    Padding="4">
+                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="4">
+
+                                    <Border Grid.Column="0"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 6"
+                                            Padding="6"
+                                            BackgroundColor="Transparent">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding SelectLightThemeCommand}" />
+                                        </Border.GestureRecognizers>
+                                        <Border.Triggers>
+                                            <DataTrigger TargetType="Border" Binding="{Binding IsLightSelected}" Value="True">
+                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource PrimaryAccentLight}, Dark={StaticResource PrimaryAccentDark}}" />
+                                            </DataTrigger>
+                                        </Border.Triggers>
+                                        <VerticalStackLayout HorizontalOptions="Center" Spacing="4">
+                                            <Label Text="{StaticResource IconSun}" FontFamily="FontAwesome" FontSize="18"
+                                                   HorizontalOptions="Center"
+                                                   TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsLightSelected}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource PrimaryOnLight}, Dark={StaticResource PrimaryOnDark}}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                            <Label Text="Light" FontSize="12" FontAttributes="Bold"
+                                                   HorizontalOptions="Center"
+                                                   TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsLightSelected}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource PrimaryOnLight}, Dark={StaticResource PrimaryOnDark}}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                        </VerticalStackLayout>
+                                    </Border>
+
+                                    <Border Grid.Column="1"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 6"
+                                            Padding="6"
+                                            BackgroundColor="Transparent">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding SelectDarkThemeCommand}" />
+                                        </Border.GestureRecognizers>
+                                        <Border.Triggers>
+                                            <DataTrigger TargetType="Border" Binding="{Binding IsDarkSelected}" Value="True">
+                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource PrimaryAccentLight}, Dark={StaticResource PrimaryAccentDark}}" />
+                                            </DataTrigger>
+                                        </Border.Triggers>
+                                        <VerticalStackLayout HorizontalOptions="Center" Spacing="4">
+                                            <Label Text="{StaticResource IconMoon}" FontFamily="FontAwesome" FontSize="18"
+                                                   HorizontalOptions="Center"
+                                                   TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsDarkSelected}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource PrimaryOnLight}, Dark={StaticResource PrimaryOnDark}}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                            <Label Text="Dark" FontSize="12" FontAttributes="Bold"
+                                                   HorizontalOptions="Center"
+                                                   TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsDarkSelected}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource PrimaryOnLight}, Dark={StaticResource PrimaryOnDark}}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                        </VerticalStackLayout>
+                                    </Border>
+
+                                    <Border Grid.Column="2"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 6"
+                                            Padding="6"
+                                            BackgroundColor="Transparent">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding SelectAutoThemeCommand}" />
+                                        </Border.GestureRecognizers>
+                                        <Border.Triggers>
+                                            <DataTrigger TargetType="Border" Binding="{Binding IsAutoSelected}" Value="True">
+                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource PrimaryAccentLight}, Dark={StaticResource PrimaryAccentDark}}" />
+                                            </DataTrigger>
+                                        </Border.Triggers>
+                                        <VerticalStackLayout HorizontalOptions="Center" Spacing="4">
+                                            <Label Text="{StaticResource IconDisplay}" FontFamily="FontAwesome" FontSize="18"
+                                                   HorizontalOptions="Center"
+                                                   TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsAutoSelected}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource PrimaryOnLight}, Dark={StaticResource PrimaryOnDark}}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                            <Label Text="Auto" FontSize="12" FontAttributes="Bold"
+                                                   HorizontalOptions="Center"
+                                                   TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsAutoSelected}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource PrimaryOnLight}, Dark={StaticResource PrimaryOnDark}}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                        </VerticalStackLayout>
+                                    </Border>
+
+                                </Grid>
+                            </Border>
+
+                            <HorizontalStackLayout IsVisible="{Binding IsAutoSelected}" Spacing="7">
+                                <BoxView Color="{AppThemeBinding Light={StaticResource OnlineIndicatorLight}, Dark={StaticResource OnlineIndicatorDark}}" WidthRequest="8" HeightRequest="8" CornerRadius="4" VerticalOptions="Center" />
+                                <Label Text="{Binding FollowingSystemText}"
+                                       FontSize="12"
+                                       TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}"
+                                       VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Editing settings: shown during an edit session -->
+                <VerticalStackLayout IsVisible="{Binding IsEditingSettingsVisible}" Spacing="8">
+
+                    <!-- History Settings: also hidden when the deployment has withdrawn the feature -->
+                    <Border Style="{StaticResource SettingsCardStyle}"
+                            IsVisible="{Binding IsHistoryAvailable}"
+                            Shadow="{AppThemeBinding Light={StaticResource BorderShadowStyle}, Dark={StaticResource BorderShadowStyle}}">
+                        <VerticalStackLayout Spacing="5">
+                            <Grid ColumnDefinitions="*,Auto" Padding="0,5">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding ToggleHistoryCommand}" />
+                                </Grid.GestureRecognizers>
+                                <Label Grid.Column="0" Text="History" Style="{StaticResource SettingsCardTitleStyle}" />
+                                <Label Grid.Column="1" Style="{StaticResource SettingsCardChevronStyle}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsHistoryExpanded}" Value="False">
+                                            <Setter Property="Rotation" Value="-90" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Grid>
+
+                            <VerticalStackLayout IsVisible="{Binding IsHistoryExpanded}" Spacing="5">
+
+                                <HorizontalStackLayout>
+                                    <Label Text="Enable Undo and Redo"
+                                           FontSize="{StaticResource FontSizeSubHeader}"
+                                           TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                           VerticalOptions="Center"
+                                           WidthRequest="180"/>
+
+                                    <Switch IsToggled="{Binding IsHistoryEnabled}"
+                                            VerticalOptions="Center"
+                                            HorizontalOptions="End" />
+
+                                </HorizontalStackLayout>
+
+                                <Label Text="Turning this off clears what has been recorded."
+                                       FontSize="12"
+                                       TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}" />
+
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Snapping Settings -->
+                    <Border Style="{StaticResource SettingsCardStyle}"
+                            Shadow="{AppThemeBinding Light={StaticResource BorderShadowStyle}, Dark={StaticResource BorderShadowStyle}}">
+                        <VerticalStackLayout Spacing="5">
+                            <Grid ColumnDefinitions="*,Auto" Padding="0,5">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding ToggleSnappingCommand}" />
+                                </Grid.GestureRecognizers>
+                                <Label Grid.Column="0" Text="Snapping Settings" Style="{StaticResource SettingsCardTitleStyle}" />
+                                <Label Grid.Column="1" Style="{StaticResource SettingsCardChevronStyle}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsSnappingExpanded}" Value="False">
+                                            <Setter Property="Rotation" Value="-90" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Grid>
+
+                            <VerticalStackLayout IsVisible="{Binding IsSnappingExpanded}" Spacing="5">
+
+                                <!-- Snapping Toggle -->
+                                <HorizontalStackLayout>
+                                    <Label Text="Enable Snapping"
+                                           FontSize="{StaticResource FontSizeSubHeader}"
+                                           TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                           VerticalOptions="Center"
+                                           WidthRequest="180"/>
+
+                                    <Switch IsToggled="{Binding IsSnappingEnabled}"
+                                            VerticalOptions="Center"
+                                            HorizontalOptions="End" />
+
+                                </HorizontalStackLayout>
+
+                                <!-- Divider -->
+                                <BoxView HeightRequest="1" BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}" Margin="0,0" />
+
+                                <!-- Default Layers -->
+                                <Label Text="Default Layers"
+                                       FontSize="{StaticResource FontSizeSubHeader}"
+                                       FontAttributes="Bold"
+                                       TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}" />
+
+                                <CollectionView ItemsSource="{Binding DefaultLayers}"
+                                                SelectionMode="None">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="model:LayerItem">
+                                            <HorizontalStackLayout VerticalOptions="Center">
+                                                <Label Text="{Binding Name}"
+                                                       TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                                       VerticalOptions="Center"
+                                                       HorizontalOptions="Start"
+                                                       WidthRequest="180"
+                                                       LineBreakMode="TailTruncation"
+                                                       MaxLines="1" />
+
+                                                <Switch IsToggled="{Binding IsSelected}"
+                                                        VerticalOptions="Center"
+                                                        HorizontalOptions="End" />
+                                            </HorizontalStackLayout>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+
+                                <!-- Divider -->
+                                <BoxView HeightRequest="1" BackgroundColor="{AppThemeBinding Light={StaticResource BorderHairlineLight}, Dark={StaticResource BorderHairlineDark}}" Margin="0,0" />
+
+                                <!-- Optional Layers -->
+                                <Label Text="Optional Layers"
+                                       FontSize="{StaticResource FontSizeSubHeader}"
+                                       FontAttributes="Bold"
+                                       TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                    />
+
+                                <CollectionView ItemsSource="{Binding OptionalLayers}"
+                                                SelectionMode="None"
+                                                HeightRequest="450">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="model:LayerItem">
+                                            <HorizontalStackLayout VerticalOptions="Center">
+                                                <Label Text="{Binding Name}"
+                                                       TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                                       VerticalOptions="Center"
+                                                       HorizontalOptions="Start"
+                                                       WidthRequest="180"
+                                                       LineBreakMode="TailTruncation"
+                                                       MaxLines="1" />
+
+                                                <Switch IsToggled="{Binding IsSelected}"
+                                                        VerticalOptions="Center"
+                                                        HorizontalOptions="End" />
+                                            </HorizontalStackLayout>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Guide Settings -->
+                    <Border Style="{StaticResource SettingsCardStyle}"
+                            Shadow="{AppThemeBinding Light={StaticResource BorderShadowStyle}, Dark={StaticResource BorderShadowStyle}}">
+                        <VerticalStackLayout Spacing="5">
+                            <Grid ColumnDefinitions="*,Auto" Padding="0,5">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding ToggleGuideCommand}" />
+                                </Grid.GestureRecognizers>
+                                <Label Grid.Column="0" Text="Guide Settings" Style="{StaticResource SettingsCardTitleStyle}" />
+                                <Label Grid.Column="1" Style="{StaticResource SettingsCardChevronStyle}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsGuideExpanded}" Value="False">
+                                            <Setter Property="Rotation" Value="-90" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Grid>
+
+                            <VerticalStackLayout IsVisible="{Binding IsGuideExpanded}" Spacing="5">
+                                <BoxView HeightRequest="1"
+                                         BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}"
+                                         Margin="0,0" />
+
+                                <HorizontalStackLayout>
+                                    <Label Text="Show Guides"
+                                           FontSize="{StaticResource FontSizeSubHeader}"
+                                           TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                           VerticalOptions="Center"
+                                           WidthRequest="180" />
+                                    <Switch IsToggled="{Binding Preferences.ShowFeatureGuide, Mode=TwoWay}"
+                                            VerticalOptions="Center"
+                                            HorizontalOptions="End" />
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Buffer Settings -->
+                    <Border Style="{StaticResource SettingsCardStyle}"
+                            Shadow="{AppThemeBinding Light={StaticResource BorderShadowStyle}, Dark={StaticResource BorderShadowStyle}}">
+                        <VerticalStackLayout Spacing="5">
+                            <Grid ColumnDefinitions="*,Auto" Padding="0,5">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding ToggleBufferCommand}" />
+                                </Grid.GestureRecognizers>
+                                <Label Grid.Column="0" Text="Buffer Settings" Style="{StaticResource SettingsCardTitleStyle}" />
+                                <Label Grid.Column="1" Style="{StaticResource SettingsCardChevronStyle}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsBufferExpanded}" Value="False">
+                                            <Setter Property="Rotation" Value="-90" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Grid>
+
+                            <VerticalStackLayout IsVisible="{Binding IsBufferExpanded}" Spacing="5">
+                                <BoxView HeightRequest="1"
+                                         BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}"
+                                         Margin="0,0" />
+                                <HorizontalStackLayout>
+                                    <Label Text="Enter Distance (m)"
+                                           FontSize="{StaticResource FontSizeSubHeader}"
+                                           TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                           VerticalOptions="Center"
+                                           WidthRequest="180" />
+                                    <Entry
+                                        x:Name="DistanceEntry"
+                                        Keyboard="Text" Text="{Binding BufferSettingsService.DistanceMetersText, Mode=TwoWay}">
+                                        <Entry.Behaviors>
+                                            <local:SignedDecimalNumberBehavior  x:Name="RangeBehavior"
+                                          Min="{Binding Source={x:Reference DistanceEntry}, Path=BindingContext.BufferSettingsService.MinDistanceMeters}"
+                                          Max="{Binding Source={x:Reference DistanceEntry}, Path=BindingContext.BufferSettingsService.MaxDistanceMeters}" />
+                                        </Entry.Behaviors>
+                                    </Entry>
+                                </HorizontalStackLayout>
+                                <Label
+                                    FontSize="12"
+                                    TextColor="{AppThemeBinding Light={StaticResource ErrorLight}, Dark={StaticResource ErrorDark}}"
+                                    IsVisible="{Binding Source={x:Reference RangeBehavior}, Path=HasWarning}"
+                                    Text="{Binding Source={x:Reference RangeBehavior}, Path=WarningMessage}" />
+                                <HorizontalStackLayout Spacing="16">
+                                    <Label Text="{Binding BufferSettingsService.MinDistanceMeters, StringFormat='Min: {0} (m)'}" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}" />
+                                    <Label Text="{Binding BufferSettingsService.MaxDistanceMeters, StringFormat='Max: {0} (m)'}" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource OnSurfaceMutedDark}}" />
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Split Polygon Overlap Settings -->
+                    <Border Style="{StaticResource SettingsCardStyle}"
+                            Shadow="{AppThemeBinding Light={StaticResource BorderShadowStyle}, Dark={StaticResource BorderShadowStyle}}">
+                        <VerticalStackLayout Spacing="5">
+                            <Grid ColumnDefinitions="*,Auto" Padding="0,5">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding ToggleOverlapCommand}" />
+                                </Grid.GestureRecognizers>
+                                <Label Grid.Column="0" Text="Split Polygon Overlap Settings" Style="{StaticResource SettingsCardTitleStyle}" />
+                                <Label Grid.Column="1" Style="{StaticResource SettingsCardChevronStyle}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsOverlapExpanded}" Value="False">
+                                            <Setter Property="Rotation" Value="-90" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Grid>
+
+                            <VerticalStackLayout IsVisible="{Binding IsOverlapExpanded}" Spacing="5">
+                                <BoxView HeightRequest="1"
+                                         BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}"
+                                         Margin="0,0" />
+
+                                <HorizontalStackLayout>
+                                    <Label Text="Keep overlapping part"
+                                           FontSize="{StaticResource FontSizeSubHeader}"
+                                           TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                           VerticalOptions="Center"
+                                           WidthRequest="180" />
+                                    <Switch IsToggled="{Binding OverlapSettingsService.KeepOverlap, Mode=TwoWay}"
+                                            VerticalOptions="Center"
+                                            HorizontalOptions="End" />
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- LPIS Transparency Settings -->
+                    <Border Style="{StaticResource SettingsCardStyle}"
+                            Shadow="{AppThemeBinding Light={StaticResource BorderShadowStyle}, Dark={StaticResource BorderShadowStyle}}">
+                        <VerticalStackLayout Spacing="5">
+                            <Grid ColumnDefinitions="*,Auto" Padding="0,5">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding ToggleTransparencyCommand}" />
+                                </Grid.GestureRecognizers>
+                                <Label Grid.Column="0" Text="LPIS Transparency Settings" Style="{StaticResource SettingsCardTitleStyle}" />
+                                <Label Grid.Column="1" Style="{StaticResource SettingsCardChevronStyle}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsTransparencyExpanded}" Value="False">
+                                            <Setter Property="Rotation" Value="-90" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Grid>
+
+                            <VerticalStackLayout IsVisible="{Binding IsTransparencyExpanded}" Spacing="5">
+                                <BoxView HeightRequest="1"
+                                         BackgroundColor="{AppThemeBinding Light={StaticResource BorderStrongLight}, Dark={StaticResource BorderStrongDark}}"
+                                         Margin="0,0" />
+
+                                <HorizontalStackLayout>
+                                    <VerticalStackLayout Spacing="5" Padding="10">
+                                        <Grid ColumnDefinitions="Auto, *, Auto">
+                                            <Label Text="Opaque"
+                                                   VerticalOptions="Center"
+                                                   Grid.Column="0"
+                                                   TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                                   Margin="0,0,10,0" />
+                                            <Slider Grid.Column="1"
+                                                    Minimum="0"
+                                                    Maximum="100"
+                                                    Value="{Binding LpisSettingsService.LayerTransparencyPercent, Mode=TwoWay}"
+                                                    VerticalOptions="Center"  WidthRequest="110" />
+                                            <Label Text="Transparent"
+                                                   VerticalOptions="Center"
+                                                   Grid.Column="2"
+                                                   TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                                   Margin="10,0,0,0" />
+                                        </Grid>
+
+                                        <Label Text="{Binding LpisSettingsService.LayerTransparencyPercent, StringFormat='{}{0:F0}%'}"
+                                               HorizontalOptions="Center"
+                                               TextColor="{AppThemeBinding Light={StaticResource OnSurfaceLight}, Dark={StaticResource OnSurfaceDark}}"
+                                               VerticalOptions="Center" />
+                                    </VerticalStackLayout>
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+
+</ContentView>

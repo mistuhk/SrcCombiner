@@ -1,0 +1,196 @@
+using Esri.ArcGISRuntime.Data;
+using Moq;
+using WG.MiEditor.Core.Services;
+using WG.MiEditor.Core.Services.Drawing.Editing.History.Journal;
+using WG.MiEditor.Core.Services.Drawing.Editing.History.OperationScope;
+using WG.MiEditor.Core.Services.Drawing.Editing.History.StateManagement;
+using WG.MiEditor.Logging.Abstractions;
+using WG.MiEditor.Tests.Common.TestFactories;
+using static WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.StateManagement.EditHistoryTestData;
+// Aliased rather than importing the whole namespace, which also declares Layer and would collide with
+// the Layer constant this file takes from EditHistoryTestData. Same pattern as the Map alias in
+// LpisAttributionControlViewModelTests.
+using FeatureLayer = Esri.ArcGISRuntime.Mapping.FeatureLayer;
+
+namespace WG.MiEditor.Core.Tests.Services.Drawing.Editing.History.StateManagement;
+
+/// <summary>
+/// The reader's own job is the where clause it builds and the batches it refuses, so that is what
+/// these assert. Turning a returned row into a snapshot belongs to FeatureSnapshotFactory, which
+/// needs a real ServiceFeatureTable and is verified by running the app.
+/// </summary>
+public class FeatureStateReaderTests
+{
+    private const string Child = "Canopy Point";
+
+    private readonly Mock<IFeatureLayerService> featureLayerService = new();
+    private readonly FeatureStateReader sut;
+
+    private string lastWhereClause = string.Empty;
+    private int layerLookups;
+
+    public FeatureStateReaderTests()
+    {
+        var layer = new FeatureLayer(ArcGisTestFactory.CreateTable()) { Name = Layer };
+
+        featureLayerService
+            .Setup(s => s.GetFeatureLayerAsync(It.IsAny<string>()))
+            .Returns(() =>
+            {
+                layerLookups++;
+                return Task.FromResult<FeatureLayer?>(LayerExists ? layer : null);
+            });
+
+        // Returning nothing found is enough: every assertion here is about the question asked, not
+        // the answer. An ArcGISFeature cannot be constructed outside a real table anyway.
+        featureLayerService
+            .Setup(s => s.GetQueryFeaturesAsync(It.IsAny<FeatureLayer>(), It.IsAny<QueryParameters>()))
+            .Returns((FeatureLayer _, QueryParameters query) =>
+            {
+                lastWhereClause = query.WhereClause;
+                return Task.FromResult<List<ArcGISFeature>?>([]);
+            });
+
+        featureLayerService
+            .Setup(s => s.GetArcGISFeatureAsync(It.IsAny<FeatureLayer>(), It.IsAny<QueryParameters>()))
+            .Returns((FeatureLayer _, QueryParameters query) =>
+            {
+                lastWhereClause = query.WhereClause;
+                return Task.FromResult<ArcGISFeature?>(null);
+            });
+
+        sut = new FeatureStateReader(
+            featureLayerService.Object,
+            Mock.Of<IFeatureSnapshotFactory>(),
+            Mock.Of<ILoggerService>());
+    }
+
+    private bool LayerExists { get; set; } = true;
+
+    // ---------------------------------------------------------------- the clause it builds
+
+    [Fact]
+    public async Task A_Keyed_Batch_Is_Queried_On_Its_Unique_Identifier()
+    {
+        await sut.ReadManyAsync(Layer, [CreateIdentity(1, "100"), CreateIdentity(2, "200")]);
+
+        Assert.Equal("POLYGONID IN (100, 200)", lastWhereClause);
+    }
+
+    [Fact]
+    public async Task A_Keyless_Batch_Is_Queried_On_The_ObjectId()
+    {
+        await sut.ReadManyAsync(Child, [CreateIdentity(7, layer: Child), CreateIdentity(8, layer: Child)]);
+
+        Assert.Equal("OBJECTID IN (7, 8)", lastWhereClause);
+    }
+
+    [Fact]
+    public async Task A_Non_Numeric_Identifier_Is_Quoted_And_Its_Apostrophes_Escaped()
+    {
+        await sut.ReadManyAsync(Layer, [new FeatureIdentity(Layer, 1, "POLYGONID", "O'Brien")]);
+
+        Assert.Equal("POLYGONID IN ('O''Brien')", lastWhereClause);
+    }
+
+    [Fact]
+    public async Task Every_Identity_In_A_Keyed_Batch_Reaches_The_Clause()
+    {
+        // The defect this guards: an earlier version filtered the batch while building the clause,
+        // so some identities were never asked about and their absence read as somebody's deletion.
+        var identities = Enumerable.Range(1, 5).Select(i => CreateIdentity(i, $"{i}00")).ToList();
+
+        await sut.ReadManyAsync(Layer, identities);
+
+        Assert.All(identities, i => Assert.Contains(i.UniqueIdentifierValue!, lastWhereClause));
+    }
+
+    // ---------------------------------------------------------------- what it refuses
+
+    [Fact]
+    public async Task A_Batch_Mixing_Keyed_And_Keyless_Identities_Is_Refused()
+    {
+        var error = await Assert.ThrowsAsync<ArgumentException>(() =>
+            sut.ReadManyAsync(Layer, [CreateIdentity(1, "100"), CreateIdentity(2)]));
+
+        Assert.Contains("all keyed or all keyless", error.Message);
+    }
+
+    [Fact]
+    public async Task A_Batch_Mixing_Two_Identifier_Fields_Is_Refused()
+    {
+        // Not reachable through FeatureIdentityPolicy today, which maps one field per layer. The
+        // guard is here because the IN clause can only name the first field, and would silently
+        // query the wrong column for the rest.
+        var error = await Assert.ThrowsAsync<ArgumentException>(() =>
+            sut.ReadManyAsync(Layer,
+            [
+                new FeatureIdentity(Layer, 1, "POLYGONID", "100"),
+                new FeatureIdentity(Layer, 2, "LPISPOLYID", "200"),
+            ]));
+
+        Assert.Contains("one unique identifier field", error.Message);
+    }
+
+    [Fact]
+    public async Task A_Bad_Batch_Is_Refused_Before_The_Layer_Is_Even_Looked_Up()
+    {
+        // A caller mistake must not be reported as whichever environment failure came first.
+        LayerExists = false;
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            sut.ReadManyAsync(Layer, [CreateIdentity(1, "100"), CreateIdentity(2)]));
+
+        Assert.Equal(0, layerLookups);
+    }
+
+    [Fact]
+    public async Task A_Missing_Layer_Is_A_Failure_Rather_Than_An_Empty_Result()
+    {
+        // An empty result cannot be told apart from "somebody deleted these rows", and the conflict
+        // detector would report exactly that to the officer.
+        LayerExists = false;
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.ReadManyAsync(Layer, [CreateIdentity(1, "100")]));
+
+        Assert.Contains(Layer, error.Message);
+    }
+
+    [Fact]
+    public async Task An_Empty_Batch_Asks_The_Service_Nothing()
+    {
+        var result = await sut.ReadManyAsync(Layer, []);
+
+        Assert.Empty(result);
+        Assert.Equal(0, layerLookups);
+    }
+
+    // ---------------------------------------------------------------- the single row read
+
+    [Fact]
+    public async Task A_Single_Keyed_Row_Is_Queried_On_Its_Unique_Identifier()
+    {
+        await sut.ReadAsync(CreateIdentity(1, "100"));
+
+        Assert.Equal("POLYGONID = 100", lastWhereClause);
+    }
+
+    [Fact]
+    public async Task A_Single_Keyless_Row_Is_Queried_On_The_ObjectId()
+    {
+        await sut.ReadAsync(CreateIdentity(7, layer: Child));
+
+        Assert.Equal("OBJECTID = 7", lastWhereClause);
+    }
+
+    [Fact]
+    public async Task A_Single_Row_On_A_Missing_Layer_Is_Null_Rather_Than_A_Failure()
+    {
+        // Deliberately unlike ReadManyAsync. The recorder calls this and wants to skip the row
+        // rather than fail the save it is recording.
+        LayerExists = false;
+
+        Assert.Null(await sut.ReadAsync(CreateIdentity(1, "100")));
+    }
+}

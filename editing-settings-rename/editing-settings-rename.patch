@@ -1,0 +1,59 @@
+diff --git a/Src/MiEditor.MainApp/Controls/Settings/SettingsSidebarControl.xaml b/Src/MiEditor.MainApp/Controls/Settings/SettingsSidebarControl.xaml
+index eb096bb..1afb442 100644
+--- a/Src/MiEditor.MainApp/Controls/Settings/SettingsSidebarControl.xaml
++++ b/Src/MiEditor.MainApp/Controls/Settings/SettingsSidebarControl.xaml
+@@ -177,7 +177,7 @@
+                 </Border>
+ 
+                 <!-- Editing settings: shown during an edit session -->
+-                <VerticalStackLayout IsVisible="{Binding IsSnappingSettingsVisible}" Spacing="8">
++                <VerticalStackLayout IsVisible="{Binding IsEditingSettingsVisible}" Spacing="8">
+ 
+                     <!-- History Settings: also hidden when the deployment has withdrawn the feature -->
+                     <Border Style="{StaticResource SettingsCardStyle}"
+diff --git a/Src/MiEditor.MainApp/ViewModels/Settings/SettingsSidebarControlViewModel.cs b/Src/MiEditor.MainApp/ViewModels/Settings/SettingsSidebarControlViewModel.cs
+index cd0f943..bcb0bda 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Settings/SettingsSidebarControlViewModel.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Settings/SettingsSidebarControlViewModel.cs
+@@ -132,8 +132,13 @@ public partial class SettingsSidebarControlViewModel
+     }
+ 
+ 
++    /// <summary>
++    /// Whether the editing sections are shown, which is every section below Theme: History, Snapping,
++    /// Guide, Buffer, Split overlap and LPIS transparency. They are available during an edit session
++    /// only. Named for snapping until the History section was added beneath the same gate.
++    /// </summary>
+     [ObservableProperty]
+-    private bool isSnappingSettingsVisible;
++    private bool isEditingSettingsVisible;
+ 
+     [ObservableProperty]
+     private bool isSnappingEnabled;
+@@ -398,7 +403,7 @@ public partial class SettingsSidebarControlViewModel
+     public void Receive(ExitCaseMessage message)
+     {
+         IsStartEditingOn = false;
+-        IsSnappingSettingsVisible = false;
++        IsEditingSettingsVisible = false;
+         this.Messenger.Send(new ToggleSnapSettingMessage(false));
+     }
+ 
+@@ -414,7 +419,7 @@ public partial class SettingsSidebarControlViewModel
+ 
+         if (IsStartEditingOn)
+         {
+-            IsSnappingSettingsVisible = true;
++            IsEditingSettingsVisible = true;
+             this.Messenger.Send(new ToggleSnapSettingMessage(true));
+         }
+     }
+@@ -431,7 +436,7 @@ public partial class SettingsSidebarControlViewModel
+         OptionalLayers.Clear();
+         DefaultLayers.Clear();
+ 
+-        IsSnappingSettingsVisible = true;
++        IsEditingSettingsVisible = true;
+         this.Messenger.Send(new ToggleSnapSettingMessage(true));
+ 
+         var map = await this.mapService.GetMapAsync();
