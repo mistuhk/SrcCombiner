@@ -1,0 +1,293 @@
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Operations/MovePointOperation.cs b/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Operations/MovePointOperation.cs
+index 261ef20..734c55b 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Operations/MovePointOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Operations/MovePointOperation.cs
+@@ -8,6 +8,7 @@ using Esri.ArcGISRuntime.Symbology;
+ using Esri.ArcGISRuntime.UI;
+ using Esri.ArcGISRuntime.UI.Editing;
+ using Microsoft.Extensions.Options;
++using WG.MiEditor.Core.Services.Drawing.Editing.History.Recording;
+ using WG.MiEditor.Core.Services.Notifications;
+ using WG.MiEditor.Enums;
+ using WG.MiEditor.Logging.Abstractions;
+@@ -32,6 +33,7 @@ public class MovePointOperation : IMoveFeatureOperation
+     private readonly INotificationManager notificationManager;
+     private readonly IFeatureLayerService featureLayerService;
+     private readonly ILoggerService loggerService;
++    private readonly IEditOperationRecorder editRecorder;
+     private readonly Symbol SelectedVertexSymbol;
+     private readonly Symbol RollbackVertexSymbol;
+     private string? layerName;
+@@ -41,6 +43,11 @@ public class MovePointOperation : IMoveFeatureOperation
+     private MapViewInteractionOptions? mapViewInteractionOptions;
+     private MapPoint? originalPoint;
+     private ArcGISFeature? activeFeature;
++
++    // Held across the two halves of a move: the before state has to be captured while the point is
++    // still where it was, and the entry written only once the save has gone through. CommitAsync is
++    // the sole caller of the save, and the finally there disposes this on every exit.
++    private IEditOperationScope? editScope;
+     private Point? selectedScreenPoint;
+     const double ClickTolerancePixels = 5;
+     private const string MovePoint = "Move Point";
+@@ -51,13 +58,15 @@ public class MovePointOperation : IMoveFeatureOperation
+         INotificationManager notificationManager,
+         IFeatureLayerService featureLayerService,
+         IMoveFeatureService moveFeatureService,
+-        ILoggerService loggerService)
++        ILoggerService loggerService,
++        IEditOperationRecorder editRecorder)
+     {
+         this.messenger = messenger;
+         this.moveFeatureService = moveFeatureService;
+         this.notificationManager = notificationManager;
+         this.featureLayerService = featureLayerService;
+         this.loggerService= loggerService;
++        this.editRecorder = editRecorder;
+ 
+         messenger.Register<MovePointOperation, ClearEditingGraphicMessage>(this, (r, m) => r.Receive(m));
+ 
+@@ -200,11 +209,38 @@ public class MovePointOperation : IMoveFeatureOperation
+             {
+                 notificationManager.Show(MovePoint, "Canopy point feature moved successfully.", NotificationType.Success);                
+                 Clear();
++
++                // Last, and with its own catch, so that a problem writing the history cannot reach
++                // the catch below and report a move that did go through as a failure. Never null
++                // here: CommitAsync is not on IMoveFeatureOperation and its only caller opens the
++                // scope two statements earlier.
++                try
++                {
++                    await editScope!.CommitAsync();
++                }
++                catch (Exception historyEx)
++                {
++                    loggerService.Error(historyEx, "Move point feature was saved but could not be recorded in the edit history.");
++
++                    notificationManager.Show(
++                        MovePoint,
++                        "The canopy point was moved, but this move cannot be undone.",
++                        NotificationType.Warning);
++                }
+             }
+         }
+         catch (Exception ex)
+         {
+             loggerService.Error(ex, "Exception occurred while running Move point feature.");
++
++            // Told, not only logged. The service can now refuse the edit and the exception reaches
++            // here, where the officer previously saw nothing at all: no success and no failure, with
++            // the graphic cleared as though the move had worked.
++            notificationManager.Show(
++                MovePoint,
++                "The canopy point could not be moved. Please try again.",
++                NotificationType.Error);
++
+             var geometryEditor = mapView?.GeometryEditor;
+             if (geometryEditor != null)
+             {
+@@ -214,6 +250,11 @@ public class MovePointOperation : IMoveFeatureOperation
+         }
+         finally
+         {     
++            // Disposed without committing on validation failure, a cancelled case request or an
++            // exception, which records nothing.
++            editScope?.Dispose();
++            editScope = null;
++
+             activeFeature = null;
+             featureSelected = false;
+ 
+@@ -255,6 +296,16 @@ public class MovePointOperation : IMoveFeatureOperation
+ 
+                     return;
+                 }
++                // Captured before the geometry is reassigned, because this is the only moment the
++                // original position still exists: the persistence strategy is handed the feature
++                // after it has moved.
++                //
++                // This is the only await between the branch test above and the stand down inside
++                // CommitAsync, and it completes synchronously because the first tap has already
++                // loaded the feature, which is what keeps a second tap out of this branch.
++                editScope = editRecorder.Begin($"Move {layerName}");
++                await editScope.CaptureUpdateBeforeAsync(layerName!, activeFeature);
++
+                 activeFeature.Geometry = e.Location;
+ 
+                 await CommitAsync();
+diff --git a/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Persistence/CanopyPointPersistenceStrategy.cs b/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Persistence/CanopyPointPersistenceStrategy.cs
+index 3eb09ab..caa7fa6 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Persistence/CanopyPointPersistenceStrategy.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Persistence/CanopyPointPersistenceStrategy.cs
+@@ -46,12 +46,7 @@ public class CanopyPointPersistenceStrategy(
+ 
+         if (featureLayer.FeatureTable is ServiceFeatureTable serviceFeatureTable)
+         {
+-            var editResults = await serviceFeatureTable.ApplyEditsAsync();
+-
+-            foreach (var result in editResults)
+-            {
+-                loggerService.Info($"Apply Edits Result: Completed={result.CompletedWithErrors}, Error={result.Error?.Message}");
+-            }         
++            await ApplyEditsOrThrow(serviceFeatureTable, targetLayerName);
+         }
+ 
+         await maxUseAreaService.UpdateMaxUseAreaFromFeatureAsync(feature);
+@@ -59,6 +54,31 @@ public class CanopyPointPersistenceStrategy(
+         return true;
+     }
+ 
++    /// <summary>
++    /// Sends the edit and raises whatever the service rejected, following
++    /// DeleteFeatureService.ApplyEditsOrThrow.
++    /// <para>
++    /// This used to log each result and return regardless, so a move the service refused still
++    /// reported success. That mattered little while nothing was watching; now the edit history records
++    /// the move, and a rejected one would leave an undo offering to put the point back somewhere it
++    /// never left.
++    /// </para>
++    /// </summary>
++    private async Task ApplyEditsOrThrow(ServiceFeatureTable serviceFeatureTable, string layerName)
++    {
++        loggerService.Info($"Attempting ApplyEdits for a move on online table '{layerName}'.");
++        var results = await serviceFeatureTable.ApplyEditsAsync();
++
++        var errors = results?.Where(r => r.CompletedWithErrors).ToList();
++        if (errors != null && errors.Count != 0)
++        {
++            var error = errors[0].Error ?? new Exception($"ApplyEdits failed for table '{layerName}'.");
++            loggerService.Error(error, $"ApplyEdits failed for a move on table '{layerName}'.");
++            throw error;
++        }
++        loggerService.Info($"ApplyEdits successful for moving a feature in '{layerName}'.");
++    }
++
+     private async Task MapAttributesAsync(Feature updateFeature)
+     {
+         ArgumentNullException.ThrowIfNull(updateFeature);
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Recording/EditOperationRecorderTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Recording/EditOperationRecorderTests.cs
+index c92b121..7778351 100644
+--- a/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Recording/EditOperationRecorderTests.cs
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Editing/History/Recording/EditOperationRecorderTests.cs
+@@ -1,5 +1,6 @@
+ 
+ using Esri.ArcGISRuntime.Data;
++using Esri.ArcGISRuntime.Geometry;
+ using Moq;
+ using WG.MiEditor.Core.Services.Drawing.Editing.History;
+ using WG.MiEditor.Core.Services.Drawing.Editing.History.FeatureTables;
+@@ -84,6 +85,31 @@ public class EditOperationRecorderTests
+         return feature;
+     }
+ 
++    private const string Original = "{\"x\":1,\"y\":1}";
++    private const string Moved = "{\"x\":9,\"y\":9}";
++
++    /// <summary>
++    /// A feature at a given position. 517 is a stored id, so the recorder accepts it without anything
++    /// from an ApplyEdits result, which an update has none of.
++    /// </summary>
++    private Feature FeatureAt(string geometryJson)
++    {
++        var feature = FeatureWith(517);
++        feature.Geometry = Geometry.FromJson(geometryJson);
++
++        return feature;
++    }
++
++    /// <summary>
++    /// Makes the factory answer from the feature as it stands when asked, rather than from a fixed
++    /// value, which is the only way a test can tell when the before state was taken.
++    /// </summary>
++    private void SnapshotTheFeatureAsItStands() =>
++        snapshotFactory
++            .Setup(f => f.CreateAsync(It.IsAny<string>(), It.IsAny<Feature>()))
++            .ReturnsAsync((string layerName, Feature feature) =>
++                CreateSnapshot(517, geometryJson: feature.Geometry?.ToJson(), layer: layerName));
++
+     /// <summary>
+     /// A feature with no object ID. The default mock implementation returns zero.
+     /// </summary>
+@@ -350,6 +376,82 @@ public class EditOperationRecorderTests
+         snapshotFactory.Verify(f => f.CreateAsync(It.IsAny<string>(), It.IsAny<Feature>()), Times.Never);
+     }
+ 
++    // ---------------------------------------------------------------- updates, which a move is
++
++    [Fact]
++    public async Task An_Update_Records_The_Captured_Before_State_And_The_Stored_After_State()
++    {
++        // What moving a point relies on. Nothing covered the update path: every other test here is
++        // about an insert.
++        SnapshotTheFeatureAsItStands();
++        stored = CreateSnapshot(517, geometryJson: Moved, layer: Child);
++
++        using var scope = sut.Begin("Move Canopy Point");
++        var feature = FeatureAt(Original);
++
++        await scope.CaptureUpdateBeforeAsync(Child, feature);
++        feature.Geometry = Geometry.FromJson(Moved);
++        await scope.CommitAsync();
++
++        var change = TheOnlyRecordedChange();
++
++        Assert.Equal(FeatureChangeKind.Update, change.Kind);
++        Assert.Equal(Original, change.Before!.GeometryJson);
++        Assert.Equal(Moved, change.After!.GeometryJson);
++    }
++
++    [Fact]
++    public async Task The_Before_State_Is_Fixed_When_It_Is_Captured_Not_When_It_Is_Committed()
++    {
++        // The guarantee a move depends on completely. The point moves between the capture and the
++        // commit, and the persistence code is handed the feature only after it has moved, so a before
++        // state taken at commit time would be the new position and the undo would do nothing.
++        SnapshotTheFeatureAsItStands();
++
++        using var scope = sut.Begin("Move Canopy Point");
++        var feature = FeatureAt(Original);
++
++        await scope.CaptureUpdateBeforeAsync(Child, feature);
++
++        feature.Geometry = Geometry.FromJson(Moved);
++        feature.SetAttributeValue("MODIFIEDDT", DateTime.UtcNow);
++
++        await scope.CommitAsync();
++
++        Assert.Equal(Original, TheOnlyRecordedChange().Before!.GeometryJson);
++    }
++
++    [Fact]
++    public async Task An_Update_Whose_Row_Cannot_Be_Read_Back_Is_Not_Recorded()
++    {
++        // Half an entry is worse than none: an undo would have nothing to compare against.
++        SnapshotTheFeatureAsItStands();
++        missing = true;
++
++        using var scope = sut.Begin("Move Canopy Point");
++
++        await scope.CaptureUpdateBeforeAsync(Child, FeatureAt(Original));
++        await scope.CommitAsync();
++
++        Assert.Equal(0, journal.UndoDepth);
++    }
++
++    [Fact]
++    public async Task An_Update_Reads_Back_The_Row_It_Captured()
++    {
++        SnapshotTheFeatureAsItStands();
++
++        using var scope = sut.Begin("Move Canopy Point");
++
++        await scope.CaptureUpdateBeforeAsync(Child, FeatureAt(Original));
++        await scope.CommitAsync();
++
++        var identity = Assert.Single(asked);
++
++        Assert.Equal(517, identity.ObjectId);
++        Assert.Equal(Child, identity.LayerName);
++    }
++
+     [Fact]
+     public void Each_Begin_Is_Independent()
+     {
