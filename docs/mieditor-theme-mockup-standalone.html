@@ -1,0 +1,2250 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-resolved="light" data-fontscale="md">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi-Editor Light / Dark Theme Mockup</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <style>
+/* 1. DESIGN TOKENS */
+:root {
+  /* header / chrome */
+  --header-bg: #1c1c1c;
+  --header-on: #ffffff;
+  --header-on-muted: #b3b3b3;
+
+  /* surfaces */
+  --surface: #ffffff;
+  --surface-variant: #f4f4f4;
+  --surface-sunken: #fafafa;
+  --statusbar-bg: #ffffff;
+  --modal-head-bg: #262626;
+  --modal-accent: #1f7fd0;
+  --subform-bg: #eef4fb;
+
+  /* text */
+  --on-surface: #222222;
+  --on-surface-muted: #5a5a5a;
+  --on-surface-subtle: #6f6f6f;
+
+  /* lines */
+  --border: #e4e4e4;          /* decorative hairlines (exempt) */
+  --border-strong: #d2d2d2;
+  --field-border: #8a8a8a;    /* control outlines (>= 3:1)    */
+
+  /* accents */
+  --primary: #0360a6;
+  --primary-hover: #024d85;
+  --primary-on: #ffffff;
+  --tab-active: #8b1a1a;
+  --tab-active-on: #ffffff;
+
+  /* state */
+  --online: #1f9d3f;          /* dot (non-text, >= 3:1) */
+  --online-text: #157a2e;     /* label (text, >= 4.5:1) */
+  --notify: #d93025;
+  --badge-on: #ffffff;
+  --toggle-on: #2196f3;
+  --focus-ring: #2b7fce;
+
+  /* map (rendered vector data, so themeable) */
+  --map-canvas: #ffffff;
+  --map-grid: rgba(0, 0, 0, 0.04);
+  --parcel-stroke: #e3009a;
+  --parcel-label: #3a3a3a;
+  --feature-pt: #2e9e44;
+  --selection-stroke: #111111;
+
+  /* parcel fills */
+  --fill-yellow: #fbf3c5;
+  --fill-green: #cdeec6;
+  --fill-blue: #d3ebf5;
+  --fill-purple: #dcdcf3;
+  --fill-orange: #fbe2c2;
+  --hatch: rgba(0, 120, 170, 0.45);
+
+  /* notifications */
+  --ok: #1f9d3f;
+  --err: #d93025;
+  --ok-soft: #eafaef;
+  --err-soft: #fdecea;
+
+  /* status chips (bg / fg) */
+  --st-ec-bg: #cfe9fc; --st-ec-fg: #0b3a5c;
+  --st-ip-bg: #f9fcb8; --st-ip-fg: #4a4400;
+  --st-qp-bg: #dbfcbd; --st-qp-fg: #244a00;
+  --st-qr-bg: #ffbebe; --st-qr-fg: #7a0c0c;
+  --st-av-bg: #d7fce5; --st-av-fg: #0a5132;
+  --st-sk-bg: #ffd37f; --st-sk-fg: #5c3d00;
+
+  /* elevation */
+  /* floating toolbar */
+  --tool-strip: #d8d8d8;
+  --tool-btn: #ffffff;
+  --tool-btn-disabled: #e3e6e9;
+  --tool-icon: #1d5e8d;
+  --tool-icon-disabled: #9db4c4;
+
+  /* cases tab */
+  --case-bar: #c9c9c9;
+  --case-yellow: #fafcd0;
+  --case-green: #d7fbe6;
+  --case-chip-border: #b5b5b5;
+  --case-strip: #ececec;
+  --case-exit: #262694;
+  --case-black: #1b1b1b;
+
+  /* attribute form (ported from modify-attribute-updated.html) */
+  --af-header: #212121;
+  --af-accent: #0078d4;
+  --af-accent-light: #eff6fc;
+  --af-accent-border: #c7e0f4;
+  --af-surface: #ffffff;
+  --af-panel: #f3f2f1;
+  --af-box: #f8f9fa;
+  --af-border: #e0e0e0;
+  --af-field-border: #8a8886;
+  --af-text: #323130;
+  --af-muted: #605e5c;
+  --af-disabled-bg: #f3f2f1;
+  --af-disabled-fg: #a19f9d;
+
+  --shadow-panel: 0 2px 14px rgba(0, 0, 0, 0.14);
+  --shadow-float: 0 3px 14px rgba(0, 0, 0, 0.18);
+  --shadow-modal: 0 18px 60px rgba(0, 0, 0, 0.35);
+  --radius: 5px;
+}
+
+:root[data-resolved="dark"] {
+  --header-bg: #0e0e0e;
+  --header-on: #f1f1f1;
+  --header-on-muted: #9a9a9a;
+
+  --surface: #1f1f1f;
+  --surface-variant: #292929;
+  --surface-sunken: #181818;
+  --statusbar-bg: #161616;
+  --modal-head-bg: #000000;
+  --modal-accent: #5cb3f5;
+  --subform-bg: #15212c;
+
+  --on-surface: #ececec;
+  --on-surface-muted: #b2b2b2;
+  --on-surface-subtle: #8c8c8c;
+
+  --border: #383838;
+  --border-strong: #4a4a4a;
+  --field-border: #757575;
+
+  --primary: #5cb3f5;
+  --primary-hover: #80c6f8;
+  --primary-on: #06243b;
+  --tab-active: #e0625d;
+  --tab-active-on: #2a0a0a;
+
+  --online: #48d17a;
+  --online-text: #48d17a;
+  --notify: #ff6a5e;
+  --badge-on: #3a0c08;
+  --toggle-on: #4da3f0;
+  --focus-ring: #7cc2ff;
+
+  --map-canvas: #ffffff;
+  --map-grid: rgba(255, 255, 255, 0.05);
+  --parcel-stroke: #e3009a;
+  --parcel-label: #3a3a3a;
+  --feature-pt: #54d172;
+  --selection-stroke: #ffffff;
+
+  --fill-yellow: #fbf3c5;
+  --fill-green: #cdeec6;
+  --fill-blue: #1f3a45;
+  --fill-purple: #312f51;
+  --fill-orange: #4a3415;
+  --hatch: rgba(120, 200, 235, 0.4);
+
+  --ok: #48d17a;
+  --err: #ff6a5e;
+  --ok-soft: #16301f;
+  --err-soft: #3a1715;
+
+  --st-ec-bg: #13384f; --st-ec-fg: #bfe2fb;
+  --st-ip-bg: #46430f; --st-ip-fg: #f4ee9c;
+  --st-qp-bg: #26451a; --st-qp-fg: #c3f29a;
+  --st-qr-bg: #4d1717; --st-qr-fg: #ffb3b3;
+  --st-av-bg: #143a26; --st-av-fg: #9bf0c2;
+  --st-sk-bg: #503615; --st-sk-fg: #ffd79a;
+
+  --tool-strip: #3a3a3a;
+  --tool-btn: #1f1f1f;
+  --tool-btn-disabled: #2d3338;
+  --tool-icon: #7fb7e8;
+  --tool-icon-disabled: #5d7283;
+
+  --case-bar: #3d3d3d;
+  --case-yellow: #45431c;
+  --case-green: #1d4030;
+  --case-chip-border: #6a6a6a;
+  --case-strip: #2d2d2d;
+  --case-exit: #5b62d6;
+  --case-black: #000000;
+
+  --af-header: #000000;
+  --af-accent: #4ea3e8;
+  --af-accent-light: #14222e;
+  --af-accent-border: #2a4a66;
+  --af-surface: #1f1f1f;
+  --af-panel: #181818;
+  --af-box: #262626;
+  --af-border: #3a3a3a;
+  --af-field-border: #757575;
+  --af-text: #ececec;
+  --af-muted: #b0b0b0;
+  --af-disabled-bg: #2a2a2a;
+  --af-disabled-fg: #7a7a7a;
+
+  --shadow-panel: 0 2px 16px rgba(0, 0, 0, 0.55);
+  --shadow-float: 0 4px 18px rgba(0, 0, 0, 0.6);
+  --shadow-modal: 0 20px 70px rgba(0, 0, 0, 0.75);
+}
+
+/* 2. FONT SCALING */
+html { font-size: 16px; }
+html[data-fontscale="sm"] { font-size: 14px; }
+html[data-fontscale="md"] { font-size: 16px; }
+html[data-fontscale="lg"] { font-size: 18px; }
+html[data-fontscale="xl"] { font-size: 20px; }
+
+/* 3. BASE */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  background: var(--surface-sunken);
+  color: var(--on-surface);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  transition: background-color 0.28s ease, color 0.28s ease;
+}
+
+.mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* one transition rule for all themed surfaces */
+header, .statusbar, .lm, .sidebar, .notif, .vtool, .tab, .icon-btn,
+.search, .online, .lm-row, .card, .seg, .chip, .note-card, .modal,
+.field input, .field .sel {
+  transition: background-color 0.28s ease, color 0.28s ease,
+              border-color 0.28s ease, box-shadow 0.28s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+a.skip {
+  position: absolute;
+  left: 8px;
+  top: -46px;
+  z-index: 999;
+  padding: 8px 14px;
+  background: var(--primary);
+  color: var(--primary-on);
+  border-radius: var(--radius);
+  font-weight: 600;
+  transition: top 0.18s;
+}
+a.skip:focus { top: 8px; }
+
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.app {
+  display: grid;
+  grid-template-rows: 42px 1fr 26px;
+  height: 100vh;
+}
+
+/* 4. HEADER */
+header {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px;
+  background: var(--header-bg);
+  color: var(--header-on);
+}
+
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.wg-logo { height: 30px; width: auto; flex: none; display: block; }
+
+.wg-text {
+  font-size: 0.59rem;
+  line-height: 1.15;
+  font-weight: 600;
+  color: var(--header-on);
+}
+.wg-text i {
+  display: block;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--header-on-muted);
+}
+
+.vsep { width: 1px; height: 26px; flex: none; background: rgba(255, 255, 255, 0.18); }
+.app-name { font-size: 0.8125rem; font-weight: 700; line-height: 1.1; white-space: nowrap; }
+.app-ver { font-size: 0.625rem; line-height: 1.1; color: var(--header-on-muted); }
+
+.case-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 190px;
+  height: 26px;
+  padding: 0 11px;
+  background: #fff;
+  border: 1px solid var(--field-border);
+  border-radius: 14px;
+}
+:root[data-resolved="dark"] .search { background: #2b2b2b; }
+.search svg { width: 13px; height: 13px; flex: none; opacity: 0.6; }
+.search input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.719rem;
+  color: var(--on-surface);
+}
+:root[data-resolved="light"] .search input { color: #222; }
+:root[data-resolved="light"] .search input::placeholder { color: #767676; }
+:root[data-resolved="dark"] .search input { color: #eee; }
+
+.online {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 11px;
+  background: #fff;
+  border-radius: 13px;
+  font-size: 0.719rem;
+  font-weight: 600;
+  color: var(--online-text);
+}
+:root[data-resolved="dark"] .online { background: #222; }
+.online .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--online); }
+
+.icon-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--header-on);
+  cursor: pointer;
+}
+.icon-btn:hover { background: rgba(255, 255, 255, 0.13); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+.badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  background: var(--notify);
+  color: var(--badge-on);
+  border-radius: 8px;
+  font-size: 0.5625rem;
+  font-weight: 700;
+}
+
+/* 5. WORK AREA + MAP */
+.work { position: relative; overflow: hidden; background: var(--map-canvas); }
+.map { position: absolute; inset: 0; }
+.map svg { display: block; width: 100%; height: 100%; }
+.parcel-label {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 9px;
+  font-weight: 500;
+  fill: var(--parcel-label);
+}
+
+/* floating navigation palette (production strip: grey track, white card buttons) */
+.vtool {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 16;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 9px;
+  background: var(--tool-strip);
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.vtool.horizontal { flex-direction: row; }
+.vtool.grabbing { cursor: grabbing; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35); }
+.vtool button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 9px;
+  background: var(--tool-btn);
+  color: var(--tool-icon);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+.vtool button:hover { filter: brightness(0.96); }
+.vtool button.active { outline: 2px solid var(--tool-icon); outline-offset: -2px; }
+.vtool button.muted {
+  background: var(--tool-btn-disabled);
+  color: var(--tool-icon-disabled);
+  box-shadow: none;
+  cursor: default;
+}
+.vtool svg { width: 21px; height: 21px; pointer-events: none; }
+
+/* 6. LAYER MANAGER */
+.lm {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 18;
+  display: flex;
+  flex-direction: column;
+  width: 286px;
+  background: var(--surface);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-panel);
+}
+.lm-collapse {
+  position: absolute;
+  top: 10px;
+  left: -13px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 30px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  color: var(--tab-active);
+  cursor: pointer;
+}
+.lm-tabs { display: flex; gap: 5px; padding: 9px 9px 6px; }
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 4px;
+  background: var(--surface-variant);
+  color: var(--on-surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab svg { width: 15px; height: 15px; }
+.tab.active { background: var(--tab-active); color: var(--tab-active-on); border-color: var(--tab-active); }
+.lm-list { overflow: auto; padding: 4px 0; }
+.lm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.lm-row:hover { background: var(--surface-variant); }
+.lm-row .chev { display: grid; place-items: center; width: 14px; flex: none; color: var(--on-surface-subtle); }
+.lm-row .nm { flex: 1; font-size: 0.781rem; }
+.eye {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--on-surface-muted);
+  cursor: pointer;
+}
+.eye:hover { background: var(--surface-variant); }
+.eye.off { color: var(--on-surface-subtle); opacity: 0.6; }
+.eye svg { width: 17px; height: 17px; }
+.lblbtn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--on-surface-muted);
+  cursor: pointer;
+}
+.lblbtn:hover { background: var(--surface-variant); }
+.lblbtn.on { color: var(--primary-on); background: var(--primary); }
+.lblbtn.disabled { color: var(--on-surface-subtle); opacity: 0.35; cursor: default; }
+.lblbtn svg { width: 16px; height: 16px; }
+
+/* 7. STATUS BAR */
+.statusbar {
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  background: var(--statusbar-bg);
+  border-top: 1px solid var(--border);
+  font-size: 0.656rem;
+  color: var(--on-surface-muted);
+}
+.sb { display: flex; align-items: center; gap: 5px; height: 100%; padding: 0 10px; }
+.sb b { color: var(--on-surface); font-weight: 600; }
+.sb .box {
+  padding: 1px 6px;
+  background: var(--surface);
+  border: 1px solid var(--field-border);
+  border-radius: 3px;
+  color: var(--on-surface);
+}
+.sb-btn {
+  padding: 2px 9px;
+  background: transparent;
+  border: 1px solid var(--tab-active);
+  border-radius: 4px;
+  color: var(--tab-active);
+  font-family: inherit;
+  font-size: 0.656rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sb.push { margin-left: auto; }
+.sb .ddl {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
+  color: var(--on-surface);
+}
+.sb-select {
+  padding: 2px 8px;
+  background: var(--surface);
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
+  color: var(--on-surface);
+  font-family: inherit;
+  font-size: 0.656rem;
+  cursor: pointer;
+}
+
+/* 8. OVERLAYS, scrim, settings sidebar, notifications */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.34);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.scrim.open { opacity: 1; pointer-events: auto; }
+
+.sidebar, .notif {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  max-width: 90vw;
+  border-left: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-float);
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sidebar {
+  width: 350px;
+  background: var(--surface-sunken);
+  display: block;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.sidebar::-webkit-scrollbar { width: 12px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 6px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sb-head { position: sticky; top: 0; z-index: 2; background: var(--surface-sunken); }
+.notif { width: 330px; background: var(--surface); }
+.sidebar.open, .notif.open { transform: translateX(0); }
+
+.sb-head, .notif-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.sb-head h2 { margin: 0; font-size: 0.9375rem; }
+.x-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--on-surface);
+  cursor: pointer;
+}
+.x-btn:hover { background: var(--surface-variant); }
+
+.sb-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+/* ---- collapsible settings card ---- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 15px;
+  background: none;
+  border: none;
+  color: var(--on-surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.card-head h3 { margin: 0; font-size: 0.875rem; }
+.card-chevron { width: 18px; height: 18px; color: var(--on-surface-subtle); transition: transform 0.2s ease; }
+.card.collapsed .card-chevron { transform: rotate(-90deg); }
+.card-body { padding: 0 15px 15px; }
+.card.collapsed .card-body { display: none; }
+.card .hint { margin: 0 0 12px; font-size: 0.75rem; color: var(--on-surface-muted); }
+
+/* theme segmented control */
+.seg {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-variant);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.seg button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--on-surface-muted);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.seg button svg { width: 18px; height: 18px; }
+.seg button[aria-checked="true"] {
+  background: var(--primary);
+  color: var(--primary-on);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.auto-note { display: flex; align-items: center; gap: 7px; margin-top: 10px; font-size: 0.719rem; color: var(--on-surface-muted); }
+.auto-note .pip { width: 8px; height: 8px; border-radius: 50%; background: var(--online); }
+
+/* text-size buttons */
+.sizes { display: flex; gap: 8px; }
+.sizes button {
+  flex: 1;
+  padding: 9px;
+  background: var(--surface-variant);
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  color: var(--on-surface);
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sizes button[aria-pressed="true"] { background: var(--primary); color: var(--primary-on); border-color: var(--primary); }
+.sizes button:nth-child(1) { font-size: 0.75rem; }
+.sizes button:nth-child(2) { font-size: 0.875rem; }
+.sizes button:nth-child(3) { font-size: 1rem; }
+.sizes button:nth-child(4) { font-size: 1.125rem; }
+
+/* status-colour legend */
+.chips { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.chip { padding: 7px 10px; border-radius: 6px; font-size: 0.719rem; font-weight: 600; text-align: center; }
+.c-ec { background: var(--st-ec-bg); color: var(--st-ec-fg); }
+.c-ip { background: var(--st-ip-bg); color: var(--st-ip-fg); }
+.c-qp { background: var(--st-qp-bg); color: var(--st-qp-fg); }
+.c-qr { background: var(--st-qr-bg); color: var(--st-qr-fg); }
+.c-av { background: var(--st-av-bg); color: var(--st-av-fg); }
+.c-sk { background: var(--st-sk-bg); color: var(--st-sk-fg); }
+
+/* settings rows (toggles, inputs, slider) */
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.row + .row { border-top: 1px solid var(--border); }
+.row .lbl { font-size: 0.8125rem; }
+.group-label { margin: 12px 0 2px; font-size: 0.719rem; font-weight: 600; letter-spacing: 0.3px; color: var(--on-surface-muted); text-transform: uppercase; }
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 21px;
+  padding: 0;
+  border: none;
+  border-radius: 11px;
+  background: var(--field-border);
+  cursor: pointer;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: left 0.18s ease;
+}
+.switch[aria-checked="true"] { background: var(--toggle-on); }
+.switch[aria-checked="true"]::after { left: 19px; }
+
+.num-input {
+  width: 64px;
+  padding: 6px 8px;
+  background: var(--surface);
+  border: 1px solid var(--field-border);
+  border-radius: 5px;
+  color: var(--on-surface);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.781rem;
+  text-align: right;
+}
+.minmax { margin-top: 6px; font-size: 0.656rem; color: var(--on-surface-subtle); }
+
+.slider-row { display: flex; align-items: center; gap: 10px; }
+.slider-row span { font-size: 0.719rem; color: var(--on-surface-muted); }
+input[type="range"] {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  accent-color: var(--toggle-on);
+}
+.slider-value { margin-top: 8px; font-size: 0.719rem; font-weight: 600; color: var(--on-surface); text-align: center; }
+
+/* 9. NOTIFICATIONS */
+.notif-head h2 { flex: 1; margin: 0; font-size: 0.875rem; }
+.notif-head h2 span { color: var(--on-surface-subtle); font-weight: 500; }
+.dismiss { background: none; border: none; color: var(--primary); font-family: inherit; font-size: 0.75rem; cursor: pointer; }
+.notif-body { overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.note-card {
+  display: flex;
+  gap: 10px;
+  padding: 11px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+}
+.note-card.ok { background: var(--ok-soft); border-left-color: var(--ok); }
+.note-card.err { background: var(--err-soft); border-left-color: var(--err); }
+.note-ic { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.note-card.ok .note-ic { color: var(--ok); }
+.note-card.err .note-ic { color: var(--err); }
+.note-card h4 { margin: 0 0 3px; font-size: 0.781rem; }
+.note-card p { margin: 0 0 5px; font-size: 0.719rem; color: var(--on-surface-muted); }
+.note-card time { font-size: 0.656rem; color: var(--on-surface-subtle); }
+.note-x { margin-left: auto; align-self: flex-start; background: none; border: none; color: var(--on-surface-subtle); cursor: pointer; }
+
+/* 10. ATTRIBUTE-FORM MODAL */
+.modal-wrap { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.45); }
+.modal-wrap.open { display: flex; }
+
+.demo-cta {
+  position: absolute;
+  bottom: 34px;
+  left: calc(50% - 100px);
+  transform: translateX(-50%);
+  z-index: 14;
+  padding: 7px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  box-shadow: var(--shadow-float);
+  color: var(--on-surface);
+  font-family: inherit;
+  font-size: 0.719rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 11. RESPONSIVE */
+@media (max-width: 1080px) {
+  .lm { width: 240px; }
+  .search { width: 140px; }
+}
+@media (max-width: 820px) {
+  .case-center { display: none; }
+  .online { display: none; }
+}
+
+/* Layer Manager tab panels */
+.lm-panel { display: none; overflow: auto; flex: 1 1 auto; min-height: 0; }
+.lm-panel.active { display: block; }
+
+/* Legends tab (mirrors production legend hierarchy) */
+.legend-body { padding: 12px 16px; font-size: 0.781rem; color: var(--on-surface); }
+.legend-group { margin: 10px 0 2px; font-size: 0.875rem; font-weight: 600; }
+.legend-layer { margin: 8px 0 2px; font-size: 0.844rem; }
+.legend-item { display: flex; align-items: center; gap: 10px; padding: 4px 0 4px 14px; font-size: 0.719rem; color: var(--on-surface-muted); }
+.sw { width: 15px; height: 15px; flex: none; }
+.sw-box { border: 1px solid #9a9a9a; }
+.sw-line { height: 2px; width: 17px; transform: rotate(-35deg); }
+
+/* Cases tab: list view */
+.cases-bar { margin: 8px 9px 0; padding: 5px 10px; background: var(--case-bar); color: var(--on-surface); font-size: 0.719rem; font-weight: 600; border-radius: 2px; }
+.cases-search { position: relative; margin: 9px 9px 6px; }
+.cases-search input {
+  width: 100%; height: 28px; padding: 0 30px 0 10px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 3px;
+  color: var(--on-surface); font-family: inherit; font-size: 0.719rem;
+}
+.cases-search svg { position: absolute; right: 8px; top: 7px; width: 14px; height: 14px; color: var(--on-surface-subtle); }
+.case-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 9px 12px; }
+.case-card { padding: 8px 10px; border-radius: 4px; cursor: pointer; position: relative; }
+.case-card.inprogress { background: var(--case-yellow); }
+.case-card.available { background: var(--case-green); }
+.case-card .cid { font-size: 0.719rem; font-weight: 600; color: var(--on-surface); }
+.case-card .crow { font-size: 0.688rem; color: var(--on-surface); margin-top: 2px; }
+.case-chip {
+  position: absolute; top: 7px; right: 8px;
+  padding: 2px 7px; background: var(--surface); border: 1px solid var(--case-chip-border);
+  border-radius: 3px; font-size: 0.594rem; font-weight: 600; letter-spacing: 0.3px; color: var(--on-surface);
+}
+
+/* Cases tab: open-case detail view */
+.case-head { margin: 9px 9px 8px; padding: 6px 10px; background: var(--case-black); color: #ffffff; font-size: 0.75rem; font-weight: 700; }
+.case-rows { display: flex; flex-direction: column; gap: 5px; padding: 0 9px; }
+.case-row { display: grid; grid-template-columns: 112px 1fr; gap: 8px; align-items: center; font-size: 0.688rem; }
+.case-row .k { background: var(--case-strip); padding: 4px 8px; text-align: right; font-weight: 600; color: var(--on-surface); border-radius: 2px; }
+.case-row .v { color: var(--on-surface); }
+.case-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; padding: 14px 9px 6px; }
+.case-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  height: 30px; padding: 0 8px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 4px;
+  color: var(--af-accent); font-family: inherit; font-size: 0.688rem; font-weight: 600; cursor: pointer;
+}
+.case-btn svg { width: 13px; height: 13px; }
+.case-btn:disabled { color: var(--on-surface-subtle); cursor: default; opacity: 0.7; }
+.case-btn.exit { background: var(--case-exit); border-color: var(--case-exit); color: #ffffff; }
+.case-checks { display: flex; flex-direction: column; gap: 9px; padding: 8px 9px; align-items: flex-start; }
+.case-checks .case-btn { width: auto; }
+
+/* Attribute form, ported verbatim from modify-attribute-updated.html */
+.maui-modal {
+  width: 95%; max-width: 1300px; height: 95vh;
+  background-color: var(--af-surface);
+  display: flex; flex-direction: column;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+  border-radius: 4px; overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: var(--af-text);
+}
+.maui-modal .modal-header {
+  background-color: var(--af-header); color: white; padding: 15px 20px;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 2px solid var(--af-accent); flex-shrink: 0;
+}
+.maui-modal .modal-title { font-weight: 600; font-size: 1.1rem; }
+.maui-modal .modal-user { font-size: 0.9rem; color: #ccc; }
+.maui-modal .workspace {
+  flex: 1; display: grid; grid-template-columns: 320px 1fr;
+  background-color: var(--af-panel); overflow: hidden;
+}
+.maui-modal .attributes-panel {
+  background-color: var(--af-surface); padding: 20px; border-right: 1px solid var(--af-border);
+  overflow-y: auto; display: flex; flex-direction: column; gap: 25px;
+}
+.maui-modal .panel-section-title {
+  font-size: 0.85rem; font-weight: 700; color: var(--af-accent);
+  text-transform: uppercase; margin-bottom: 10px; border-bottom: 1px solid var(--af-border); padding-bottom: 5px;
+}
+.maui-modal .identity-box { background: var(--af-box); border: 1px solid var(--af-border); padding: 15px; border-radius: 4px; }
+.maui-modal .main-panel { padding: 25px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+.maui-modal .context-header-box {
+  background: var(--af-surface); padding: 20px; border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); border: 1px solid var(--af-border);
+  flex-shrink: 0; margin-bottom: 10px;
+}
+.maui-modal .context-header-title {
+  font-size: 1rem; color: var(--af-text); font-weight: 700; margin-bottom: 15px; display: block;
+  border-bottom: 1px solid var(--af-border); padding-bottom: 10px;
+}
+.maui-modal .context-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px 20px; }
+.maui-modal .data-label { font-size: 0.7rem; color: var(--af-muted); text-transform: uppercase; margin-bottom: 4px; display: block; font-weight: 700; }
+.maui-modal .data-value { font-weight: 600; color: var(--af-text); font-size: 0.9rem; }
+.maui-modal .collapsible-section { background: var(--af-surface); border: 1px solid var(--af-border); border-radius: 4px; transition: box-shadow 0.2s; margin-bottom: 5px; }
+.maui-modal .section-header {
+  background: var(--af-box); padding: 12px 20px; cursor: pointer;
+  display: flex; justify-content: space-between; align-items: center; user-select: none;
+  border-bottom: 1px solid transparent;
+}
+.maui-modal .section-header:hover { filter: brightness(0.97); }
+.maui-modal .section-title { font-weight: 600; color: var(--af-text); font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
+.maui-modal .section-content { display: none; padding: 20px; border-top: 1px solid var(--af-border); }
+.maui-modal .section-content.open { display: block; }
+.maui-modal .data-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+.maui-modal .data-table th { text-align: left; font-size: 0.75rem; color: var(--af-muted); border-bottom: 1px solid #ccc; padding: 8px; background: var(--af-box); }
+.maui-modal .data-table td { font-size: 0.9rem; padding: 10px 8px; border-bottom: 1px solid var(--af-panel); color: var(--af-text); }
+.maui-modal .data-table tr:last-child td { border-bottom: none; }
+.maui-modal .add-form-box { background: var(--af-accent-light); border: 1px solid var(--af-accent-border); padding: 15px; border-radius: 4px; }
+.maui-modal .add-title { font-size: 0.85rem; font-weight: 700; color: var(--af-accent); margin-bottom: 12px; display: block; }
+.maui-modal input[type="text"], .maui-modal input[type="date"], .maui-modal select {
+  width: 100%; height: 36px; padding: 0 10px;
+  border: 1px solid var(--af-field-border); border-radius: 2px; font-size: 0.9rem;
+  background: var(--af-surface); color: var(--af-text); font-family: inherit;
+}
+.maui-modal input:focus, .maui-modal select:focus { border-color: var(--af-accent); outline: 2px solid rgba(0, 120, 212, 0.2); }
+.maui-modal input:disabled { background-color: var(--af-disabled-bg); color: var(--af-disabled-fg); }
+.maui-modal .crn-input-row { display: grid; grid-template-columns: 1fr auto auto; gap: 15px; align-items: end; }
+.maui-modal .checkbox-container-centered { display: flex; align-items: center; gap: 8px; height: 36px; padding-bottom: 1px; }
+.maui-modal .modal-footer {
+  background: var(--af-surface); padding: 15px 20px; border-top: 1px solid var(--af-border);
+  display: flex; justify-content: flex-end; align-items: center; gap: 15px; flex-shrink: 0;
+}
+.maui-modal .btn { height: 36px; padding: 0 24px; border-radius: 2px; font-weight: 600; cursor: pointer; border: none; font-size: 0.9rem; transition: all 0.2s; font-family: inherit; }
+.maui-modal .btn-primary { background: var(--af-accent); color: white; }
+.maui-modal .btn-primary:hover { background: #005a9e; }
+.maui-modal .btn-secondary { background: var(--af-surface); border: 1px solid var(--af-accent); color: var(--af-accent); }
+.maui-modal .btn-secondary:hover { background: var(--af-accent-light); }
+.maui-modal .btn-add { background: var(--af-accent); color: white; border: none; width: 100%; }
+.maui-modal .btn-add:hover { background: #005a9e; }
+.maui-modal .btn-icon-only { width: 30px; height: 30px; padding: 0; background: transparent; color: #999; font-size: 1.2rem; border: none; cursor: pointer; }
+.maui-modal .btn-action-row { display: flex; justify-content: flex-end; margin-top: 10px; }
+.maui-modal .toggle-icon { transition: transform 0.2s; color: var(--af-muted); }
+
+/* Layer tree collapse and right-click context menu */
+.lm-group.collapsed > .lm-children { display: none; }
+.ctx-menu {
+  position: fixed;
+  z-index: 80;
+  min-width: 170px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: var(--shadow-float);
+  display: none;
+}
+.ctx-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 12px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.781rem;
+  color: var(--on-surface);
+  cursor: pointer;
+}
+.ctx-item:hover { background: var(--surface-variant); }
+.ctx-item.disabled { color: var(--on-surface-subtle); opacity: 0.5; cursor: default; }
+.ctx-item.disabled:hover { background: none; }
+.ctx-sep { height: 1px; margin: 4px 6px; background: var(--border); }
+
+  </style>
+</head>
+
+<body data-label-mode="inline">
+  <a href="#mapcanvas" class="skip">Skip to map</a>
+
+  <div class="app">
+    <!-- ===== HEADER ===== -->
+    <header>
+      <div class="brand">
+        <img class="wg-logo" alt="Llywodraeth Cymru / Welsh Government" src="data:image/png;base64,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" />
+        <div class="vsep"></div>
+        <div>
+          <div class="app-name">Mi-Editor [Dev] - IACS Year:2025</div>
+          <div class="app-ver">Version: 1.5.0</div>
+        </div>
+      </div>
+
+      <div class="case-center mono" id="caseCenter"></div>
+
+      <div class="header-right">
+        <label class="search" title="Zoom to feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>
+          <input type="text" placeholder="CRN, XY, OSNG, Postcode" aria-label="Search by CRN, coordinates, OS grid reference or postcode" />
+        </label>
+        <div class="online"><span class="dot"></span>Online</div>
+        <button class="icon-btn" id="settingsBtn" aria-label="Open settings" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+        </button>
+        <button class="icon-btn" aria-label="User profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" /></svg></button>
+        <button class="icon-btn" id="bellBtn" aria-label="Notifications, 5 unread" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+          <span class="badge" id="bellBadge">5</span>
+        </button>
+        <button class="icon-btn" aria-label="Help and version information"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg></button>
+      </div>
+    </header>
+
+    <!-- ===== WORK AREA ===== -->
+    <main class="work" id="mapcanvas">
+      <div class="map" aria-label="Vector map view of LPIS parcels for the active case">
+        <svg viewBox="0 0 1200 740" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Field parcels; one parcel selected">
+          <defs>
+            <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M60 0H0V60" fill="none" stroke="var(--map-grid)" stroke-width="1" /></pattern>
+            <pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="var(--hatch)" stroke-width="1.4" /></pattern>
+          </defs>
+          <rect width="1200" height="740" fill="var(--map-canvas)" />
+          <rect width="1200" height="740" fill="url(#grid)" />
+          <g stroke="var(--parcel-stroke)" stroke-width="1.6" fill="none">
+            <polygon points="60,120 230,90 250,250 120,300 50,230" /><polygon points="230,90 430,70 460,210 250,250" />
+            <polygon points="460,210 650,180 690,330 470,360 250,250" /><polygon points="650,180 880,150 920,300 690,330" />
+            <polygon points="880,150 1140,130 1150,330 920,300" /><polygon points="120,300 250,250 470,360 420,540 180,560 90,420" />
+            <polygon points="470,360 690,330 760,520 560,600 420,540" /><polygon points="690,330 920,300 1000,470 880,560 760,520" />
+            <polygon points="920,300 1150,330 1160,560 1000,470" /><polygon points="180,560 420,540 480,680 250,700" />
+            <polygon points="560,600 760,520 880,560 820,700 600,710" />
+          </g>
+          <polygon points="460,210 650,180 690,330 470,360 250,250" fill="var(--fill-green)" opacity=".75" />
+          <polygon points="230,90 430,70 460,210 250,250" fill="var(--fill-yellow)" opacity=".8" />
+          <polygon points="920,300 1150,330 1160,560 1000,470" fill="var(--fill-green)" opacity=".7" />
+          <polygon points="880,150 1140,130 1150,330 920,300" fill="var(--fill-purple)" opacity=".55" />
+          <polygon points="180,560 420,540 480,680 250,700" fill="var(--fill-orange)" opacity=".5" />
+          <polygon points="650,180 880,150 920,300 690,330" fill="url(#hatch)" />
+          <polygon points="650,180 880,150 920,300 690,330" fill="none" stroke="var(--selection-stroke)" stroke-width="2.6" />
+          <g fill="var(--feature-pt)" stroke="#fff" stroke-width="1.2">
+            <circle cx="300" cy="180" r="5" /><circle cx="560" cy="270" r="5" /><circle cx="540" cy="470" r="5" />
+            <circle cx="800" cy="240" r="5" /><circle cx="980" cy="400" r="5" /><circle cx="360" cy="430" r="5" />
+          </g>
+          <g class="parcel-label" id="canopyLabels" text-anchor="start" style="display:none">
+            <text x="308" y="176">CP 12</text><text x="568" y="266">CP 27</text><text x="548" y="466">CP 41</text>
+            <text x="808" y="236">CP 53</text><text x="988" y="396">CP 66</text><text x="368" y="426">CP 74</text>
+          </g>
+          <g class="parcel-label" id="mapLabels" text-anchor="middle">
+            <text x="150" y="210">SO0229 2630</text><text x="340" y="160">SO0229 5935</text><text x="470" y="280">SO0229 4918</text>
+            <text x="780" y="245">SO0229 7631</text><text x="1030" y="240">SO0229 9740</text><text x="280" y="430">SO0229 3017</text>
+            <text x="610" y="470">SO0229 7815</text><text x="1080" y="450">SO0228 9910</text><text x="340" y="620">SO0229 4605</text><text x="710" y="630">SO0228 7698</text>
+          </g>
+        </svg>
+      </div>
+
+      <!-- draggable navigation palette -->
+      <div class="vtool" id="vtool" role="toolbar" aria-label="Map navigation tools (drag to reposition)" aria-orientation="vertical" title="Drag to reposition">
+        <button aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14" /></svg></button>
+        <button aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14" /></svg></button>
+        <button aria-label="Info tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5" /><path d="M12 7.6h.01" stroke-width="2.4" stroke-linecap="round" /></svg></button>
+        <button aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.4 11A8.5 8.5 0 0 0 4.7 7.8" /><path d="M4.7 3.8v4h4" /><path d="M3.6 13a8.5 8.5 0 0 0 15.7 3.2" /><path d="M19.3 20.2v-4h-4" /></svg></button>
+        <button class="muted" aria-label="Previous view" disabled><svg viewBox="0 0 24 24"><path d="M10.2 4.8 3.8 10l6.4 5.2v-3.4c4.8-.3 7.9 1.3 9.9 4.9-.4-5.9-3.7-9.1-9.9-9.4z" fill="currentColor" /></svg></button>
+        <button class="muted" aria-label="Next view" disabled><svg viewBox="0 0 24 24"><path d="M13.8 4.8 20.2 10l-6.4 5.2v-3.4c-4.8-.3-7.9 1.3-9.9 4.9.4-5.9 3.7-9.1 9.9-9.4z" fill="currentColor" /></svg></button>
+        <button aria-label="Measurement tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><g transform="rotate(-38 11 14)"><rect x="3" y="11" width="15.5" height="6" rx="1.2" /><path d="M7 11v2.6M10.7 11v2.6M14.4 11v2.6" /></g><path d="M17.6 3.8 21.4 5.6l-2.3 1.9z" fill="currentColor" stroke="none" /></svg></button>
+      </div>
+
+      <button class="demo-cta" id="attrBtn2">Open an attribute form</button>
+
+      <!-- Layer Manager -->
+      <aside class="lm" id="lm" aria-label="Layer manager">
+        <button class="lm-collapse" aria-label="Collapse layer panel"><svg viewBox="0 0 24 24" width="13" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6" /></svg></button>
+        <div class="lm-tabs" role="tablist">
+          <div class="tab active" role="tab" aria-selected="true" tabindex="0" data-tab="layers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 9 5-9 5-9-5z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></svg>Layers</div>
+          <div class="tab" role="tab" aria-selected="false" tabindex="0" data-tab="legends"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>Legends</div>
+          <div class="tab" role="tab" aria-selected="false" tabindex="0" data-tab="cases"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18" /></svg>Cases</div>
+        </div>
+        <div class="lm-panel active" id="tab-layers"><div class="lm-list" id="lmList"></div></div>
+      <div class="lm-panel" id="tab-legends"><div class="legend-body" id="legendBody"></div></div>
+      <div class="lm-panel" id="tab-cases">
+        <div id="casesListView">
+          <div class="cases-bar" id="casesBar">Total Cases: 5</div>
+          <div class="cases-search">
+            <input type="text" id="caseSearch" placeholder="Enter Case ID or CRN, Ref No" aria-label="Search cases by ID, CRN or reference number" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>
+          </div>
+          <div class="case-list" id="caseList"></div>
+        </div>
+        <div id="caseDetailView" hidden></div>
+      </div>
+      </aside>
+    </main>
+
+    <!-- ===== STATUS BAR ===== -->
+    <footer class="statusbar">
+      <div class="sb">Map Scale 1: <span class="box mono">3801</span></div>
+      <div class="sb">OSSHEET: <b>SO0328</b></div>
+      <div class="sb">NGFIELD: <b class="mono">2174</b></div>
+      <div class="sb">X: <b class="mono">303218.13</b></div>
+      <div class="sb">Y: <b class="mono">228746.78</b></div>
+      <div class="sb"><button class="sb-btn">Browsers</button></div>
+      <div class="sb push">
+        <select class="sb-select" aria-label="Select layer">
+          <option>Commons</option>
+          <option>England Boundary</option>
+          <option>NVZ</option>
+          <option>Phase1</option>
+          <option>S15 Areas</option>
+          <option>SSSI</option>
+          <option>Public Rights of Way</option>
+          <option>S15 Lines</option>
+          <option>EIAScreening</option>
+          <option>Tech Perm Ddn</option>
+          <option>History Parcel</option>
+          <option>Canopy Poly History</option>
+          <option>Canopy Point History</option>
+          <option selected>LPIS Ply</option>
+          <option>Permanent Deduction</option>
+          <option>Published Habitat</option>
+          <option>Canopy Poly</option>
+          <option>Canopy Point</option>
+          <option>Sketch Poly</option>
+          <option>Sketch Line</option>
+          <option>Sketch Point</option>
+        </select>
+      </div>
+      <div class="sb">
+        <select class="sb-select" aria-label="Select editable layer">
+          <option selected>LPIS Ply</option>
+          <option>Permanent Deduction</option>
+          <option>Canopy Point</option>
+          <option>Canopy Poly</option>
+          <option>Published Habitat</option>
+        </select>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ===== OVERLAYS ===== -->
+  <div class="scrim" id="scrim"></div>
+
+  <!-- SETTINGS (collapsible sections; theme cards are prototype additions,
+       the lower cards mirror the production Settings panel) -->
+  <aside class="sidebar" id="sidebar" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="sb-head">
+      <h2>Settings</h2>
+      <button class="x-btn" id="closeSettings" aria-label="Close settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+    </div>
+
+    <div class="sb-body">
+      <!-- Appearance -->
+      <section class="card">
+        <button class="card-head" aria-expanded="true" aria-controls="sec-appearance">
+          <h3>Theme</h3>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+        <div class="card-body" id="sec-appearance">
+          <p class="hint">Choose how Mi-Editor looks. <b>Auto</b> follows your Windows theme and updates instantly when it changes.</p>
+          <div class="seg" role="radiogroup" aria-label="Theme">
+            <button role="radio" data-theme-choice="light" aria-checked="true" aria-label="Light theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>Light</button>
+            <button role="radio" data-theme-choice="dark" aria-checked="false" aria-label="Dark theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>Dark</button>
+            <button role="radio" data-theme-choice="auto" aria-checked="false" aria-label="Auto, follow system theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>Auto</button>
+          </div>
+          <div class="auto-note" id="autoNote" style="display: none"><span class="pip"></span><span id="autoText">Following system: Light</span></div>
+        </div>
+      </section>
+
+      <!-- Text size -->
+      <section class="card collapsed">
+        <button class="card-head" aria-expanded="false" aria-controls="sec-textsize">
+          <h3>Text size</h3>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+        <div class="card-body" id="sec-textsize">
+          <p class="hint">Scales the whole interface. Also honours the Windows display-scaling setting.</p>
+          <div class="sizes" role="group" aria-label="Text size">
+            <button data-size="sm" aria-pressed="false">A</button>
+            <button data-size="md" aria-pressed="true">A</button>
+            <button data-size="lg" aria-pressed="false">A</button>
+            <button data-size="xl" aria-pressed="false">A</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Case status colours (reference legend) -->
+      <section class="card collapsed">
+        <button class="card-head" aria-expanded="false" aria-controls="sec-status">
+          <h3>Case status colours</h3>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+        <div class="card-body" id="sec-status">
+          <p class="hint">Reference legend. These status colours are remapped per theme so they stay legible (WCAG AA) on either background.</p>
+          <div class="chips">
+            <span class="chip c-ec">Edit Complete</span><span class="chip c-ip">In Progress</span>
+            <span class="chip c-qp">QA Passed</span><span class="chip c-qr">QA Rejected</span>
+            <span class="chip c-av">Available</span><span class="chip c-sk">Sketch In&nbsp;Prog.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Snapping Settings -->
+      <section class="card collapsed">
+        <button class="card-head" aria-expanded="false" aria-controls="sec-snapping">
+          <h3>Snapping Settings</h3>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+        <div class="card-body" id="sec-snapping">
+          <div class="row"><span class="lbl">Enable snapping</span><button class="switch" role="switch" aria-checked="true" aria-label="Enable snapping"></button></div>
+          <div class="group-label">Default layers</div>
+          <div class="row"><span class="lbl">LPIS Ply</span><button class="switch" role="switch" aria-checked="true" aria-label="Snap to LPIS Ply"></button></div>
+          <div class="row"><span class="lbl">MI Sketch Point</span><button class="switch" role="switch" aria-checked="true" aria-label="Snap to MI Sketch Point"></button></div>
+          <div class="row"><span class="lbl">MI Sketch Line</span><button class="switch" role="switch" aria-checked="false" aria-label="Snap to MI Sketch Line"></button></div>
+        </div>
+      </section>
+
+      <!-- Guide Settings -->
+      <section class="card collapsed">
+        <button class="card-head" aria-expanded="false" aria-controls="sec-guide">
+          <h3>Guide Settings</h3>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+        <div class="card-body" id="sec-guide">
+          <div class="row"><span class="lbl">Show guides</span><button class="switch" role="switch" aria-checked="false" aria-label="Show guides"></button></div>
+        </div>
+      </section>
+
+      <!-- Buffer Settings -->
+      <section class="card collapsed">
+        <button class="card-head" aria-expanded="false" aria-controls="sec-buffer">
+          <h3>Buffer Settings</h3>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+        <div class="card-body" id="sec-buffer">
+          <div class="row"><span class="lbl">Enter distance (m)</span><input class="num-input" type="number" value="10" min="-5" max="10" aria-label="Buffer distance in metres" /></div>
+          <div class="minmax">Min: -5 (m) &nbsp;&nbsp; Max: 10 (m)</div>
+        </div>
+      </section>
+
+      <!-- Split Polygon Overlap Settings -->
+      <section class="card collapsed">
+        <button class="card-head" aria-expanded="false" aria-controls="sec-split">
+          <h3>Split Polygon Overlap Settings</h3>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+        <div class="card-body" id="sec-split">
+          <div class="row"><span class="lbl">Keep overlapping part</span><button class="switch" role="switch" aria-checked="true" aria-label="Keep overlapping part"></button></div>
+        </div>
+      </section>
+
+      <!-- LPIS Transparency Settings -->
+      <section class="card collapsed">
+        <button class="card-head" aria-expanded="false" aria-controls="sec-transparency">
+          <h3>LPIS Transparency Settings</h3>
+          <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+        <div class="card-body" id="sec-transparency">
+          <div class="slider-row">
+            <span>Opaque</span>
+            <input type="range" id="transparency" min="0" max="100" value="0" aria-label="LPIS layer transparency percentage" />
+            <span>Transparent</span>
+          </div>
+          <div class="slider-value" id="transparencyValue">0%</div>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <!-- NOTIFICATIONS -->
+  <aside class="notif" id="notif" role="dialog" aria-modal="true" aria-label="Notifications">
+    <div class="notif-head">
+      <h2>Notifications <span>5</span></h2>
+      <button class="dismiss" id="dismissAll">Dismiss all</button>
+      <button class="x-btn" id="closeNotif" aria-label="Close notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+    </div>
+    <div class="notif-body" id="notifBody">
+      <div class="note-card ok"><svg class="note-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="m8 12 3 3 5-6" /></svg><div><h4>Success</h4><p>LPIS attributes saved successfully.</p><time>02 Jun 2026 15:52</time></div><button class="note-x" aria-label="Dismiss notification"><svg viewBox="0 0 24 24" width="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12" /></svg></button></div>
+      <div class="note-card ok"><svg class="note-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="m8 12 3 3 5-6" /></svg><div><h4>Delete Feature</h4><p>1 feature(s) has been deleted successfully.</p><time>02 Jun 2026 15:52</time></div><button class="note-x" aria-label="Dismiss notification"><svg viewBox="0 0 24 24" width="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12" /></svg></button></div>
+      <div class="note-card err"><svg class="note-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" /></svg><div><h4>Add Polygon</h4><p>Lpis poly cannot be created or deleted outside the AOI.</p><time>02 Jun 2026 15:52</time></div><button class="note-x" aria-label="Dismiss notification"><svg viewBox="0 0 24 24" width="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12" /></svg></button></div>
+      <div class="note-card err"><svg class="note-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" /></svg><div><h4>Import Ply</h4><p>Import failed: Lpis poly cannot be created or deleted outside the AOI.</p><time>02 Jun 2026 15:51</time></div><button class="note-x" aria-label="Dismiss notification"><svg viewBox="0 0 24 24" width="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12" /></svg></button></div>
+      <div class="note-card err"><svg class="note-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" /></svg><div><h4>Add Polygon</h4><p>Lpis poly cannot be created or deleted outside the AOI.</p><time>02 Jun 2026 15:51</time></div><button class="note-x" aria-label="Dismiss notification"><svg viewBox="0 0 24 24" width="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12" /></svg></button></div>
+    </div>
+  </aside>
+
+  <!-- ATTRIBUTE-FORM MODAL -->
+  <div class="modal-wrap" id="modalWrap">
+  <div class="maui-modal" role="dialog" aria-modal="true" aria-label="Modify attributes">
+    <div class="modal-header">
+      <span class="modal-title">Modify Attributes (LPIS): SN6318 / 5706</span>
+      <span class="modal-user">User: OGEORGEK | IACSYear: 2026</span>
+    </div>
+
+    <div class="workspace">
+      <div class="attributes-panel">
+        <div>
+          <div class="panel-section-title">OSSheet/NGField</div>
+          <div class="identity-box">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+              <input type="checkbox" id="chkNewField" />
+              <label for="chkNewField" style="margin:0; cursor:pointer; color:var(--af-text); font-weight:600;">New Field Number?</label>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+              <div><label class="data-label">OSSheet</label><input type="text" id="txtOS" value="SN6318" disabled /></div>
+              <div><label class="data-label">NGField</label><input type="text" id="txtNG" value="5706" disabled /></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel-section-title">Parcel Attributes</div>
+          <div style="margin-bottom:15px;"><label class="data-label">Review Date</label><input type="date" value="2026-01-12" /></div>
+          <div style="margin-bottom:15px;"><label class="data-label">Parcel Status</label><select><option>InProgress</option><option>Undeclared</option><option>Complete</option></select></div>
+          <div style="margin-bottom:15px;"><label class="data-label">MM Resolved Status</label><select><option>Not Visited</option><option>Visited</option><option>Technical Only</option></select></div>
+          <div style="margin-bottom:15px;"><label class="data-label">Com Land Reg</label><select><option>N</option><option>Y</option></select></div>
+          <div style="margin-bottom:15px;"><label class="data-label">Habitat Review</label><select><option>Complete</option></select></div>
+          <div><label class="data-label">Canopy Status</label><select><option>Complete</option></select></div>
+        </div>
+      </div>
+
+      <div class="main-panel">
+        <div class="context-header-box">
+          <span class="context-header-title">&#128196; Parcel Context Details</span>
+          <div class="context-grid">
+            <div><span class="data-label">Polygon ID</span><span class="data-value">123456</span></div>
+            <div><span class="data-label">IACS Area</span><span class="data-value">1.25 ha</span></div>
+            <div><span class="data-label">WelshLand</span><span class="data-value">Y</span></div>
+            <div><span class="data-label">YRESTBLSHD</span><span class="data-value">2026</span></div>
+            <div><span class="data-label">IACS Year</span><span class="data-value">2026</span></div>
+            <div><span class="data-label">User</span><span class="data-value">OGEORGEK</span></div>
+            <div><span class="data-label">Shared</span><span class="data-value">No</span></div>
+            <div><span class="data-label">Max U Area</span><span class="data-value">1.20 ha</span></div>
+          </div>
+        </div>
+
+        <div class="collapsible-section">
+          <div class="section-header">
+            <span class="section-title">&#128203; Declared Information</span>
+            <span class="toggle-icon">&#9660;</span>
+          </div>
+          <div class="section-content">
+            <table class="data-table" id="declaredTable">
+              <thead>
+                <tr><th>Declared Crop</th><th>Declared Type</th><th>Declared Area (ha)</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Wheat</td><td>Arable</td><td>1.25</td></tr>
+                <tr><td>Barley</td><td>Arable</td><td>2.25</td></tr>
+              </tbody>
+            </table>
+            <div class="btn-action-row">
+              <button class="btn btn-secondary" id="useDeclaredBtn">&#11015; Use Declared Information</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="collapsible-section">
+          <div class="section-header">
+            <span class="section-title">&#127793; Found Information</span>
+            <span class="toggle-icon" style="transform: rotate(180deg);">&#9660;</span>
+          </div>
+          <div class="section-content open">
+            <table class="data-table">
+              <thead><tr><th>Type</th><th>Crop</th><th>Area (ha)</th><th>Method</th><th>EFA</th><th></th></tr></thead>
+              <tbody id="foundTableBody"></tbody>
+            </table>
+
+            <div class="add-form-box">
+              <span class="add-title">Add New Found Info</span>
+              <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:15px; margin-bottom:10px;">
+                <div><label class="data-label">Found Type</label><select id="ftType"><option>Arable</option><option>Perm. Pasture</option></select></div>
+                <div><label class="data-label">Found Crop</label><select id="ftCrop"><option>Barley</option><option>Oats</option></select></div>
+                <div><label class="data-label">Area (ha)</label><input type="text" id="ftArea" placeholder="0.00" /></div>
+              </div>
+              <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:15px;">
+                <div><label class="data-label">Method</label><select id="ftMethod"><option>GIS</option><option>Paced</option></select></div>
+                <div><label class="data-label">EFA?</label><select id="ftEFA"><option>No</option><option>Yes</option></select></div>
+                <div style="display:flex; align-items:end;">
+                  <button class="btn btn-add" id="addFoundBtn">+ Add Found Info</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="collapsible-section">
+          <div class="section-header">
+            <span class="section-title">&#127380; CRNs</span>
+            <span class="toggle-icon">&#9660;</span>
+          </div>
+          <div class="section-content">
+            <table class="data-table">
+              <thead><tr><th>CRN</th><th>Shared Grazing</th><th></th></tr></thead>
+              <tbody id="crnTableBody">
+                <tr><td>A0019866</td><td>No</td><td><button class="btn-icon-only" aria-label="Delete row">&times;</button></td></tr>
+              </tbody>
+            </table>
+
+            <div class="add-form-box">
+              <span class="add-title">Add Shared CRN</span>
+              <div class="crn-input-row">
+                <div>
+                  <label class="data-label">CRN</label>
+                  <input type="text" id="newCRN" placeholder="e.g. A000000" />
+                </div>
+                <div class="checkbox-container-centered">
+                  <input type="checkbox" id="chkGrazing" style="width:16px; height:16px; margin:0;" />
+                  <label for="chkGrazing" style="margin:0; cursor:pointer; color:var(--af-text); font-weight:400; font-size:0.9rem;">Shared Grazing?</label>
+                </div>
+                <div>
+                  <button class="btn btn-add" id="addCrnBtn" style="width:auto; padding:0 30px;">+ Add CRN</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modalCancel">Close</button>
+      <button class="btn btn-primary">Save All Changes</button>
+    </div>
+  </div>
+</div>
+
+  <script>
+"use strict";
+// Mi-Editor theme prototype interaction layer.
+// Theme switching, OS follow, font scaling, collapsible settings,
+// a draggable navigation palette, and the overlay panels.
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+// localStorage may be blocked, so reads and writes fail safe.
+const Store = {
+    get(key, fallback) {
+        try {
+            return localStorage.getItem(key) ?? fallback;
+        }
+        catch {
+            return fallback;
+        }
+    },
+    set(key, value) {
+        try {
+            localStorage.setItem(key, value);
+        }
+        catch {
+            // ignore quota or privacy-mode errors
+        }
+    },
+};
+const Theme = (() => {
+    const KEY = "mi-theme";
+    const root = document.documentElement;
+    const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+    let choice = Store.get(KEY, "light");
+    const resolve = (c) => c === "auto" ? (systemDark.matches ? "dark" : "light") : c;
+    const apply = () => {
+        const resolved = resolve(choice);
+        root.dataset.theme = choice;
+        root.dataset.resolved = resolved;
+        $$('[data-theme-choice]').forEach((btn) => btn.setAttribute("aria-checked", String(btn.dataset.themeChoice === choice)));
+        const note = $("#autoNote");
+        const noteText = $("#autoText");
+        if (note)
+            note.style.display = choice === "auto" ? "flex" : "none";
+        if (noteText)
+            noteText.textContent = `Following system: ${resolved === "dark" ? "Dark" : "Light"}`;
+    };
+    const set = (next) => {
+        choice = next;
+        Store.set(KEY, next);
+        apply();
+    };
+    const init = () => {
+        const radios = $$('[data-theme-choice]');
+        radios.forEach((radio, index) => {
+            radio.addEventListener("click", () => set(radio.dataset.themeChoice));
+            radio.addEventListener("keydown", (event) => {
+                const key = event.key;
+                const forward = key === "ArrowRight" || key === "ArrowDown";
+                const back = key === "ArrowLeft" || key === "ArrowUp";
+                if (!forward && !back)
+                    return;
+                event.preventDefault();
+                const nextIndex = (index + (forward ? 1 : -1) + radios.length) % radios.length;
+                const nextRadio = radios[nextIndex];
+                set(nextRadio.dataset.themeChoice);
+                nextRadio.focus();
+            });
+        });
+        systemDark.addEventListener("change", () => {
+            if (choice === "auto")
+                apply();
+        });
+        apply();
+    };
+    return { init };
+})();
+const FontScaling = (() => {
+    const KEY = "mi-fontscale";
+    const root = document.documentElement;
+    let scale = Store.get(KEY, "md");
+    // Type is sized in rem, so changing the root size scales the whole UI.
+    const apply = () => {
+        root.dataset.fontscale = scale;
+        $$('[data-size]').forEach((btn) => btn.setAttribute("aria-pressed", String(btn.dataset.size === scale)));
+    };
+    const init = () => {
+        $$('[data-size]').forEach((btn) => btn.addEventListener("click", () => {
+            scale = btn.dataset.size;
+            Store.set(KEY, scale);
+            apply();
+        }));
+        apply();
+    };
+    return { init };
+})();
+const Collapsibles = (() => {
+    const init = () => {
+        $$(".card-head").forEach((head) => {
+            head.addEventListener("click", () => {
+                const card = head.closest(".card");
+                if (!card)
+                    return;
+                const collapsed = card.classList.toggle("collapsed");
+                head.setAttribute("aria-expanded", String(!collapsed));
+            });
+        });
+    };
+    return { init };
+})();
+const DraggableToolbar = (() => {
+    const PADDING = 8;
+    const DRAG_THRESHOLD = 4;
+    let toolbar;
+    let workArea;
+    let panel;
+    let dragging = false;
+    let moved = false;
+    let startX = 0;
+    let startY = 0;
+    let originX = 0;
+    let originY = 0;
+    // Keep the palette inside the map container so it cannot slide under
+    // the right-hand panel, and lay it out horizontally near the edges.
+    const clamp = () => {
+        const panelWidth = panel?.offsetWidth ?? 0;
+        const top = parseFloat(toolbar.style.top || "12");
+        const nearTop = top <= PADDING + 2;
+        const nearBottom = top >= workArea.clientHeight - toolbar.offsetHeight - PADDING - 2;
+        toolbar.classList.toggle("horizontal", nearTop || nearBottom);
+        const maxX = Math.max(PADDING, workArea.clientWidth - panelWidth - toolbar.offsetWidth - PADDING);
+        const maxY = Math.max(PADDING, workArea.clientHeight - toolbar.offsetHeight - PADDING);
+        const x = Math.min(Math.max(PADDING, parseFloat(toolbar.style.left || "12")), maxX);
+        const y = Math.min(Math.max(PADDING, parseFloat(toolbar.style.top || "12")), maxY);
+        toolbar.style.left = `${x}px`;
+        toolbar.style.top = `${y}px`;
+        toolbar.style.right = "auto";
+    };
+    const onMove = (event) => {
+        if (!dragging)
+            return;
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+        if (Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD)
+            moved = true;
+        if (!moved)
+            return;
+        toolbar.style.right = "auto";
+        toolbar.style.left = `${originX + dx}px`;
+        toolbar.style.top = `${originY + dy}px`;
+        clamp();
+    };
+    const onUp = () => {
+        dragging = false;
+        toolbar.classList.remove("grabbing");
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+    };
+    const init = () => {
+        const tb = $("#vtool");
+        const work = $("#mapcanvas");
+        if (!tb || !work)
+            return;
+        toolbar = tb;
+        workArea = work;
+        panel = $("#lm");
+        toolbar.addEventListener("pointerdown", (event) => {
+            dragging = true;
+            moved = false;
+            startX = event.clientX;
+            startY = event.clientY;
+            const rect = toolbar.getBoundingClientRect();
+            const workRect = workArea.getBoundingClientRect();
+            originX = rect.left - workRect.left;
+            originY = rect.top - workRect.top;
+            toolbar.classList.add("grabbing");
+            document.addEventListener("pointermove", onMove);
+            document.addEventListener("pointerup", onUp);
+        });
+        // Suppress the click that follows a drag so tools do not fire on drop.
+        toolbar.addEventListener("click", (event) => {
+            if (moved) {
+                event.stopPropagation();
+                event.preventDefault();
+                moved = false;
+            }
+        }, true);
+        window.addEventListener("resize", clamp);
+    };
+    return { init };
+})();
+const Overlays = (() => {
+    let scrim;
+    let sidebar;
+    let notifications;
+    let lastOpener = null;
+    const closeAll = (keepScrim = false) => {
+        sidebar.classList.remove("open");
+        notifications.classList.remove("open");
+        if (!keepScrim) {
+            scrim.classList.remove("open");
+            lastOpener?.focus();
+        }
+    };
+    const open = (panel, focusTarget, opener) => {
+        closeAll(true);
+        lastOpener = opener;
+        panel.classList.add("open");
+        scrim.classList.add("open");
+        focusTarget?.focus();
+    };
+    const init = () => {
+        scrim = $("#scrim");
+        sidebar = $("#sidebar");
+        notifications = $("#notif");
+        $("#settingsBtn")?.addEventListener("click", (e) => open(sidebar, $("#closeSettings"), e.currentTarget));
+        $("#bellBtn")?.addEventListener("click", (e) => open(notifications, $("#closeNotif"), e.currentTarget));
+        $("#closeSettings")?.addEventListener("click", () => closeAll());
+        $("#closeNotif")?.addEventListener("click", () => closeAll());
+        scrim.addEventListener("click", () => closeAll());
+        document.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape")
+                return;
+            if ($("#modalWrap")?.classList.contains("open"))
+                Modal.close();
+            else
+                closeAll();
+        });
+    };
+    return { init, closeAll };
+})();
+const Notifications = (() => {
+    const refreshCount = () => {
+        const count = $$("#notifBody .note-card").length;
+        const counter = $(".notif-head h2 span");
+        if (counter)
+            counter.textContent = String(count);
+        const badge = $("#bellBadge");
+        if (badge) {
+            badge.style.display = count === 0 ? "none" : "grid";
+            badge.textContent = String(count);
+        }
+        $("#bellBtn")?.setAttribute("aria-label", `Notifications, ${count} unread`);
+    };
+    const init = () => {
+        $("#notifBody")?.addEventListener("click", (event) => {
+            const dismiss = event.target.closest(".note-x");
+            if (!dismiss)
+                return;
+            dismiss.closest(".note-card")?.remove();
+            refreshCount();
+        });
+        $("#dismissAll")?.addEventListener("click", () => {
+            const body = $("#notifBody");
+            if (body)
+                body.innerHTML = "";
+            refreshCount();
+        });
+    };
+    return { init };
+})();
+const Modal = (() => {
+    const open = () => {
+        $("#modalWrap")?.classList.add("open");
+        $("#modalCancel")?.focus();
+    };
+    const close = () => {
+        $("#modalWrap")?.classList.remove("open");
+    };
+    const init = () => {
+        $("#attrBtn2")?.addEventListener("click", open);
+        $("#modalCancel")?.addEventListener("click", close);
+        $("#modalWrap")?.addEventListener("click", (event) => {
+            if (event.target === $("#modalWrap"))
+                close();
+        });
+    };
+    return { init, open, close };
+})();
+const LayerManager = (() => {
+    // Tree mirrors the production Layer Manager. Leaf layers (no children) can
+    // carry a label toggle; groups cannot. hasLabelDef marks which leaves have a
+    // published label definition; the rest are greyed (no authoring in code).
+    const tree = [
+        { name: "Working", visible: false, expanded: true, children: [
+                { name: "Editing Area", visible: true, hasLabelDef: false },
+            ] },
+        { name: "MI Sketches", visible: false, expanded: true, children: [
+                { name: "MI Sketch Point", visible: true, hasLabelDef: false },
+                { name: "MI Sketch Line", visible: true, hasLabelDef: false },
+                { name: "MI Sketch Poly", visible: true, hasLabelDef: true },
+            ] },
+        { name: "Sketches", visible: false, expanded: true, children: [
+                { name: "Sketch Point", visible: true, hasLabelDef: true },
+                { name: "Sketch Line", visible: true, hasLabelDef: false },
+                { name: "Sketch Poly", visible: true, hasLabelDef: false },
+            ] },
+        { name: "FM5 Markups", visible: true, expanded: true, children: [
+                { name: "Online Markups", visible: true, expanded: false, children: [] },
+                { name: "RPW View", visible: true, expanded: false, children: [] },
+            ] },
+        { name: "Schemes", visible: true, expanded: true, children: [
+                { name: "Habitat", visible: false, expanded: true, children: [
+                        { name: "Canopy Point", visible: true, hasLabelDef: true, labelTarget: "canopyLabels" },
+                        { name: "Canopy Poly", visible: true, hasLabelDef: true },
+                        { name: "Published Habitat", visible: true, hasLabelDef: true },
+                    ] },
+                { name: "IACS", visible: true, expanded: true, children: [
+                        { name: "Permanent Deduction", visible: false, hasLabelDef: true },
+                        { name: "LPIS Ply", visible: true, hasLabelDef: true, labelsOn: true, labelTarget: "mapLabels" },
+                    ] },
+            ] },
+    ];
+    const EYE_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7a9.7 9.7 0 0 1 5 1.4M22 12s-4 7-10 7a9.7 9.7 0 0 1-5-1.4"/><path d="M3 3l18 18"/></svg>';
+    const CHEV_DOWN = '<svg viewBox="0 0 24 24" width="12" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>';
+    const CHEV_RIGHT = '<svg viewBox="0 0 24 24" width="12" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>';
+    const LABEL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 18 9.5 6h1L15 18M6.5 14h7.5"/><path d="M17 18l3-8 3 8M18 15.5h4"/></svg>';
+    const isGroup = (n) => Array.isArray(n.children);
+    const mode = () => (document.body.dataset.labelMode === "menu" ? "menu" : "inline");
+    const labelControl = (n) => {
+        if (isGroup(n) || mode() === "menu")
+            return "";
+        if (!n.hasLabelDef)
+            return `<button class="lblbtn disabled" aria-disabled="true" aria-label="No label definition for ${n.name}">${LABEL_ICON}</button>`;
+        const target = n.labelTarget ? ` data-target="${n.labelTarget}"` : "";
+        return `<button class="lblbtn${n.labelsOn ? " on" : ""}"${target} aria-pressed="${n.labelsOn ? "true" : "false"}" aria-label="Toggle labels for ${n.name}">${LABEL_ICON}</button>`;
+    };
+    const rowMarkup = (n, depth) => {
+        const chev = isGroup(n) ? (n.expanded ? CHEV_DOWN : CHEV_RIGHT) : "";
+        const leaf = !isGroup(n);
+        const data = leaf
+            ? ` data-leaf="true" data-hasdef="${n.hasLabelDef ? "true" : "false"}" data-labelson="${n.labelsOn ? "true" : "false"}"${n.labelTarget ? ` data-target="${n.labelTarget}"` : ""}`
+            : ' data-leaf="false"';
+        return `
+      <div class="lm-row" style="padding-left:${12 + depth * 18}px"${data} data-name="${n.name}">
+        <span class="chev"${isGroup(n) ? ' role="button" tabindex="0"' : ""}>${chev}</span>
+        <span class="nm">${n.name}</span>
+        ${labelControl(n)}
+        <button class="eye${n.visible ? "" : " off"}" aria-pressed="${n.visible}" aria-label="${n.visible ? "Hide" : "Show"} ${n.name} layer">
+          ${n.visible ? EYE_OPEN : EYE_OFF}
+        </button>
+      </div>`;
+    };
+    const renderNode = (n, depth) => {
+        if (!isGroup(n))
+            return rowMarkup(n, depth);
+        const kids = (n.children ?? []).map((c) => renderNode(c, depth + 1)).join("");
+        return `<div class="lm-group${n.expanded ? "" : " collapsed"}">${rowMarkup(n, depth)}<div class="lm-children">${kids}</div></div>`;
+    };
+    const syncLabels = (row) => {
+        const target = row.getAttribute("data-target");
+        if (!target)
+            return;
+        const group = document.getElementById(target);
+        if (!group)
+            return;
+        const on = row.dataset.labelson === "true";
+        const eyeOff = row.querySelector(".eye")?.classList.contains("off");
+        group.style.display = on && !eyeOff ? "" : "none";
+    };
+    let menu = null;
+    let menuRow = null;
+    const hideMenu = () => { if (menu)
+        menu.style.display = "none"; };
+    const buildMenu = () => {
+        const m = document.createElement("div");
+        m.className = "ctx-menu";
+        m.innerHTML =
+            '<button class="ctx-item" data-act="zoom">Zoom to Layer</button>' +
+                '<button class="ctx-item disabled" data-act="props" aria-disabled="true">Show Properties</button>' +
+                '<button class="ctx-item disabled" data-act="rename" aria-disabled="true">Rename</button>' +
+                '<button class="ctx-item disabled" data-act="remove" aria-disabled="true">Remove</button>' +
+                '<div class="ctx-sep"></div>' +
+                '<button class="ctx-item" data-act="label">Show Label</button>';
+        document.body.appendChild(m);
+        m.addEventListener("click", (e) => {
+            const item = e.target.closest(".ctx-item");
+            if (!item || item.classList.contains("disabled"))
+                return;
+            if (item.dataset.act === "label" && menuRow) {
+                const on = menuRow.dataset.labelson !== "true";
+                menuRow.dataset.labelson = String(on);
+                syncLabels(menuRow);
+            }
+            hideMenu();
+        });
+        return m;
+    };
+    const openMenu = (row, x, y) => {
+        if (!menu)
+            menu = buildMenu();
+        menuRow = row;
+        const labelItem = menu.querySelector('[data-act="label"]');
+        if (labelItem) {
+            const enabled = row.dataset.leaf === "true" && row.dataset.hasdef === "true";
+            labelItem.classList.toggle("disabled", !enabled);
+            if (enabled)
+                labelItem.removeAttribute("aria-disabled");
+            else
+                labelItem.setAttribute("aria-disabled", "true");
+            labelItem.textContent = row.dataset.labelson === "true" ? "Hide Label" : "Show Label";
+        }
+        menu.style.display = "block";
+        menu.style.left = "0px";
+        menu.style.top = "0px";
+        const rect = menu.getBoundingClientRect();
+        const px = x + rect.width > window.innerWidth - 8 ? Math.max(8, x - rect.width) : x;
+        const py = y + rect.height > window.innerHeight - 8 ? Math.max(8, y - rect.height) : y;
+        menu.style.left = `${px}px`;
+        menu.style.top = `${py}px`;
+    };
+    const init = () => {
+        const list = $("#lmList");
+        if (!list)
+            return;
+        list.innerHTML = tree.map((n) => renderNode(n, 0)).join("");
+        $$(".lm-row", list).forEach((r) => syncLabels(r));
+        list.addEventListener("click", (event) => {
+            const target = event.target;
+            const chev = target.closest(".chev");
+            if (chev && chev.querySelector("svg")) {
+                const group = chev.closest(".lm-group");
+                if (group) {
+                    const collapsed = group.classList.toggle("collapsed");
+                    chev.innerHTML = collapsed ? CHEV_RIGHT : CHEV_DOWN;
+                }
+                return;
+            }
+            const eye = target.closest(".eye");
+            if (eye) {
+                const hidden = eye.classList.toggle("off");
+                eye.setAttribute("aria-pressed", String(!hidden));
+                syncLabels(eye.closest(".lm-row"));
+                return;
+            }
+            const lbl = target.closest(".lblbtn");
+            if (lbl && !lbl.classList.contains("disabled")) {
+                const on = lbl.classList.toggle("on");
+                lbl.setAttribute("aria-pressed", String(on));
+                const row = lbl.closest(".lm-row");
+                row.dataset.labelson = String(on);
+                syncLabels(row);
+            }
+        });
+        if (mode() === "menu") {
+            list.addEventListener("contextmenu", (event) => {
+                const row = event.target.closest(".lm-row");
+                if (!row)
+                    return;
+                event.preventDefault();
+                openMenu(row, event.clientX, event.clientY);
+            });
+            document.addEventListener("click", (e) => {
+                if (menu && menu.style.display === "block" && !menu.contains(e.target))
+                    hideMenu();
+            });
+        }
+    };
+    return { init };
+})();
+const TabPanels = (() => {
+    const init = () => {
+        $$(".tab").forEach((tab) => tab.addEventListener("click", () => {
+            $$(".tab").forEach((t) => {
+                t.classList.remove("active");
+                t.setAttribute("aria-selected", "false");
+            });
+            tab.classList.add("active");
+            tab.setAttribute("aria-selected", "true");
+            const name = tab.dataset.tab;
+            $$(".lm-panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${name}`));
+        }));
+    };
+    return { init };
+})();
+const Legends = (() => {
+    // Mirrors the production Legends tab. Swatch colours are map symbology,
+    // so they stay fixed across themes.
+    const entries = [
+        { kind: "group", label: "FM5 Markups" },
+        { kind: "layer", label: "RPW View" },
+        { kind: "layer", label: "RPW Poly" },
+        { kind: "box", label: "<all other values>", color: "#cdd5f4", border: "#7e8cc8" },
+        { kind: "box", label: "PERM", color: "#4a4a4a", border: "#333333" },
+        { kind: "box", label: "LPIS", color: "#d9d9d9", border: "#9a9a9a" },
+        { kind: "layer", label: "RPW Line" },
+        { kind: "line", label: "", color: "#6b6b6b" },
+        { kind: "layer", label: "RPW Point" },
+        { kind: "point", label: "", color: "#2f2f2f" },
+        { kind: "group", label: "Online Markups" },
+        { kind: "layer", label: "FM5 Markup Poly" },
+        { kind: "box", label: "<all other values>", color: "#c9c9ef", border: "#8d8dc9" },
+        { kind: "box", label: "LPIS", color: "#f7a8cd", border: "#d36da0" },
+        { kind: "box", label: "PERM", color: "#6fd2f0", border: "#3f9cc0" },
+        { kind: "layer", label: "FM5 Markup Line" },
+        { kind: "line", label: "<all other values>", color: "#b03a2e" },
+        { kind: "line", label: "LPIS Lines", color: "#d4781f" },
+        { kind: "line", label: "PERM Lines", color: "#2e6da4" },
+        { kind: "layer", label: "FM5 Markup Point" },
+        { kind: "point", label: "<all other values>", color: "#3a8f3a" },
+        { kind: "point", label: "RPW", color: "#1b3c8c" },
+        { kind: "group", label: "Schemes" },
+        { kind: "layer", label: "IACS" },
+        { kind: "layer", label: "LPIS Ply" },
+    ];
+    const markup = (e) => {
+        if (e.kind === "group")
+            return `<div class="legend-group">${e.label}</div>`;
+        if (e.kind === "layer")
+            return `<div class="legend-layer">${e.label}</div>`;
+        if (e.kind === "box")
+            return `<div class="legend-item"><span class="sw sw-box" style="background:${e.color};border-color:${e.border}"></span>${e.label}</div>`;
+        if (e.kind === "line")
+            return `<div class="legend-item"><span class="sw sw-line" style="background:${e.color}"></span>${e.label}</div>`;
+        return `<div class="legend-item"><svg class="sw" viewBox="0 0 16 16"><path d="M3 13 8 2l5 11-5-3z" fill="${e.color}"/></svg>${e.label}</div>`;
+    };
+    const init = () => {
+        const body = $("#legendBody");
+        if (body)
+            body.innerHTML = entries.map(markup).join("");
+    };
+    return { init };
+})();
+const Cases = (() => {
+    const cases = [
+        { id: 1213724, crn: "A0000990", ref: "I202500990", status: "INPROGRESS" },
+        { id: 1213727, crn: "A0000290", ref: "I202500290", status: "AVAILABLE" },
+        { id: 1213728, crn: "A0001111", ref: "I202501111", status: "INPROGRESS" },
+        { id: 1419452, crn: "A0038269", ref: "I123507072", status: "AVAILABLE" },
+        { id: 1419560, crn: "A0026036", ref: "I202526036", status: "AVAILABLE" },
+    ];
+    // Detail fields shown for an open case (per the EDITOR role screenshot).
+    const detail = { scheme: "INSP", subType: "HAB", role: "EDITOR", pool: "MI_INSP_EDIT" };
+    const ICONS = {
+        edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3l5 5L8 21H3v-5z"/></svg>',
+        trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
+        send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h9M4 12l4-8 12 8-12 8z"/></svg>',
+        topo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7.5 10.5 16M16 7.5 13.5 16M8.5 6h7"/></svg>',
+        health: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>',
+    };
+    const cardMarkup = (c) => `
+    <div class="case-card ${c.status === "INPROGRESS" ? "inprogress" : "available"}" data-case="${c.id}"
+         role="button" tabindex="0" aria-label="Open case ${c.id}">
+      <span class="case-chip">${c.status}</span>
+      <div class="cid">ID: ${c.id}</div>
+      <div class="crow">CRN: ${c.crn}</div>
+      <div class="crow">Reference No: ${c.ref}</div>
+    </div>`;
+    const detailMarkup = (c) => `
+    <div class="case-head">Case Id: ${c.id}</div>
+    <div class="case-rows">
+      <div class="case-row"><span class="k">CRN:</span><span class="v">${c.crn}</span></div>
+      <div class="case-row"><span class="k">Reference No:</span><span class="v">${c.ref}</span></div>
+      <div class="case-row"><span class="k">Status:</span><span class="v">${c.status}</span></div>
+      <div class="case-row"><span class="k">Scheme:</span><span class="v">${detail.scheme}</span></div>
+      <div class="case-row"><span class="k">Scheme Sub Type:</span><span class="v">${detail.subType}</span></div>
+      <div class="case-row"><span class="k">Role:</span><span class="v">${detail.role}</span></div>
+      <div class="case-row"><span class="k">Case Pool:</span><span class="v">${detail.pool}</span></div>
+      <div class="case-row"><span class="k">Download File Package:</span><span class="v"></span></div>
+    </div>
+    <div class="case-actions">
+      <button class="case-btn" disabled>${ICONS.edit}Start Editing</button>
+      <button class="case-btn">${ICONS.trash}Discard Case</button>
+      <button class="case-btn">${ICONS.send}Submit for QA</button>
+      <button class="case-btn exit" id="exitCaseBtn">Exit Case</button>
+    </div>
+    <div class="case-checks">
+      <button class="case-btn">${ICONS.topo}Run Topological Checks</button>
+      <button class="case-btn">${ICONS.health}Run Health Checks</button>
+    </div>`;
+    const renderList = (filter = "") => {
+        const list = $("#caseList");
+        const bar = $("#casesBar");
+        if (!list || !bar)
+            return;
+        const term = filter.trim().toLowerCase();
+        const visible = cases.filter((c) => !term ||
+            String(c.id).includes(term) ||
+            c.crn.toLowerCase().includes(term) ||
+            c.ref.toLowerCase().includes(term));
+        bar.textContent = `Total Cases: ${visible.length}`;
+        list.innerHTML = visible.map(cardMarkup).join("");
+    };
+    const openCase = (id) => {
+        const c = cases.find((x) => x.id === id);
+        if (!c)
+            return;
+        const listView = $("#casesListView");
+        const detailView = $("#caseDetailView");
+        if (!listView || !detailView)
+            return;
+        detailView.innerHTML = detailMarkup(c);
+        listView.hidden = true;
+        detailView.hidden = false;
+        const center = $("#caseCenter");
+        if (center)
+            center.textContent = `Case Id:${c.id}, CRN:${c.crn}`;
+    };
+    const exitCase = () => {
+        const listView = $("#casesListView");
+        const detailView = $("#caseDetailView");
+        if (listView)
+            listView.hidden = false;
+        if (detailView) {
+            detailView.hidden = true;
+            detailView.innerHTML = "";
+        }
+        const center = $("#caseCenter");
+        if (center)
+            center.textContent = "";
+    };
+    const init = () => {
+        renderList();
+        $("#caseSearch")?.addEventListener("input", (e) => renderList(e.target.value));
+        $("#caseList")?.addEventListener("click", (e) => {
+            const card = e.target.closest(".case-card");
+            if (card?.dataset.case)
+                openCase(Number(card.dataset.case));
+        });
+        $("#caseList")?.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter")
+                return;
+            const card = e.target.closest(".case-card");
+            if (card?.dataset.case)
+                openCase(Number(card.dataset.case));
+        });
+        $("#caseDetailView")?.addEventListener("click", (e) => {
+            if (e.target.closest("#exitCaseBtn"))
+                exitCase();
+        });
+    };
+    return { init };
+})();
+/* Attribute form behaviours, ported from modify-attribute-updated.html */
+const AttributeForm = (() => {
+    const toggleSection = (header) => {
+        const content = header.nextElementSibling;
+        const icon = header.querySelector(".toggle-icon");
+        if (!content)
+            return;
+        const open = content.classList.toggle("open");
+        if (icon)
+            icon.style.transform = open ? "rotate(180deg)" : "rotate(0deg)";
+    };
+    const toggleIdentity = () => {
+        const isNew = $("#chkNewField")?.checked ?? false;
+        const os = $("#txtOS");
+        const ng = $("#txtNG");
+        if (os)
+            os.disabled = !isNew;
+        if (ng)
+            ng.disabled = !isNew;
+        if (isNew)
+            os?.focus();
+    };
+    const addFoundItem = () => {
+        const type = $("#ftType");
+        const crop = $("#ftCrop");
+        const area = $("#ftArea");
+        const method = $("#ftMethod");
+        const efa = $("#ftEFA");
+        const tbody = $("#foundTableBody");
+        if (!type || !crop || !area || !method || !efa || !tbody)
+            return;
+        tbody.insertAdjacentHTML("beforeend", `<tr><td>${type.value}</td><td>${crop.value}</td><td>${area.value || "0.00"}</td>` +
+            `<td>${method.value}</td><td>${efa.value}</td>` +
+            `<td><button class="btn-icon-only" aria-label="Delete row">\u00d7</button></td></tr>`);
+        area.value = "";
+        type.selectedIndex = 0;
+        crop.selectedIndex = 0;
+        method.selectedIndex = 0;
+        efa.selectedIndex = 0;
+    };
+    const addCRN = () => {
+        const crn = $("#newCRN");
+        const grazing = $("#chkGrazing");
+        const tbody = $("#crnTableBody");
+        if (!crn || !grazing || !tbody || !crn.value)
+            return;
+        tbody.insertAdjacentHTML("beforeend", `<tr><td>${crn.value}</td><td>${grazing.checked ? "Yes" : "No"}</td>` +
+            `<td><button class="btn-icon-only" aria-label="Delete row">\u00d7</button></td></tr>`);
+        crn.value = "";
+        grazing.checked = false;
+    };
+    const useDeclaredInfo = () => {
+        const declaredRows = $$("#declaredTable tbody tr");
+        const foundBody = $("#foundTableBody");
+        if (!foundBody)
+            return;
+        declaredRows.forEach((row) => {
+            const cells = row.cells;
+            foundBody.insertAdjacentHTML("beforeend", `<tr><td>${cells[1].innerText}</td><td>${cells[0].innerText}</td><td>${cells[2].innerText}</td>` +
+                `<td></td><td></td><td><button class="btn-icon-only" aria-label="Delete row">\u00d7</button></td></tr>`);
+        });
+        const foundSection = foundBody.closest(".section-content");
+        if (foundSection && !foundSection.classList.contains("open")) {
+            foundSection.classList.add("open");
+            const icon = foundSection.previousElementSibling?.querySelector(".toggle-icon");
+            if (icon)
+                icon.style.transform = "rotate(180deg)";
+        }
+    };
+    const init = () => {
+        const wrap = $("#modalWrap");
+        if (!wrap)
+            return;
+        wrap.addEventListener("click", (e) => {
+            const target = e.target;
+            const header = target.closest(".section-header");
+            if (header) {
+                toggleSection(header);
+                return;
+            }
+            if (target.closest(".btn-icon-only")) {
+                target.closest("tr")?.remove();
+                return;
+            }
+            if (target.closest("#addFoundBtn")) {
+                addFoundItem();
+                return;
+            }
+            if (target.closest("#addCrnBtn")) {
+                addCRN();
+                return;
+            }
+            if (target.closest("#useDeclaredBtn")) {
+                useDeclaredInfo();
+                return;
+            }
+        });
+        $("#chkNewField")?.addEventListener("change", toggleIdentity);
+    };
+    return { init };
+})();
+const Controls = (() => {
+    const init = () => {
+        $$('[role="switch"]').forEach((sw) => sw.addEventListener("click", () => sw.setAttribute("aria-checked", String(sw.getAttribute("aria-checked") !== "true"))));
+        const toolbar = $("#vtool");
+        $$(".vtool button").forEach((tool) => tool.addEventListener("click", () => {
+            $$(".vtool button", toolbar).forEach((b) => {
+                b.classList.remove("active");
+                b.removeAttribute("aria-pressed");
+            });
+            tool.classList.add("active");
+            tool.setAttribute("aria-pressed", "true");
+        }));
+        const slider = $("#transparency");
+        const readout = $("#transparencyValue");
+        slider?.addEventListener("input", () => {
+            if (readout)
+                readout.textContent = `${slider.value}%`;
+        });
+    };
+    return { init };
+})();
+const init = () => {
+    Theme.init();
+    FontScaling.init();
+    Collapsibles.init();
+    DraggableToolbar.init();
+    Overlays.init();
+    Notifications.init();
+    Modal.init();
+    LayerManager.init();
+    TabPanels.init();
+    Legends.init();
+    Cases.init();
+    AttributeForm.init();
+    Controls.init();
+};
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+}
+else {
+    init();
+}
+
+  </script>
+</body>
+</html>
