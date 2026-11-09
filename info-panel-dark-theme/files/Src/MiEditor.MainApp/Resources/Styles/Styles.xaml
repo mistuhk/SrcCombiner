@@ -1,0 +1,128 @@
+
+<?xml version="1.0" encoding="UTF-8" ?>
+<?xaml-comp compile="true" ?>
+<ResourceDictionary 
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <x:String x:Key="FontFamily">Montserrat</x:String>
+    <x:Double x:Key="FontSizeStandard">12</x:Double>
+    <x:Double x:Key="FontSizeSubHeader">14</x:Double>
+
+    <Style TargetType="Label">
+        <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeStandard}" />
+    </Style>
+
+    <Style TargetType="Button">
+        <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeStandard}" />
+    </Style>
+
+    <!-- Native input controls: themed colours so they follow the app theme on Windows (a bare
+         Entry/Picker/Editor/DatePicker otherwise paints platform-default light chrome). Explicitly
+         styled fields override these (explicit > implicit). -->
+    <Style TargetType="Entry">
+        <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeStandard}" />
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource FormSurfaceLight}, Dark={StaticResource FormSurfaceDark}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource FormTextLight}, Dark={StaticResource FormTextDark}}" />
+        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource FormMutedLight}, Dark={StaticResource FormMutedDark}}" />
+    </Style>
+
+    <Style TargetType="Picker">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource FormSurfaceLight}, Dark={StaticResource FormSurfaceDark}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource FormTextLight}, Dark={StaticResource FormTextDark}}" />
+        <Setter Property="TitleColor" Value="{AppThemeBinding Light={StaticResource FormMutedLight}, Dark={StaticResource FormMutedDark}}" />
+    </Style>
+
+    <Style TargetType="DatePicker">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource FormSurfaceLight}, Dark={StaticResource FormSurfaceDark}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource FormTextLight}, Dark={StaticResource FormTextDark}}" />
+    </Style>
+
+    <Style TargetType="Editor">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource FormSurfaceLight}, Dark={StaticResource FormSurfaceDark}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource FormTextLight}, Dark={StaticResource FormTextDark}}" />
+    </Style>
+
+    <Style TargetType="CheckBox">
+        <Setter Property="Color" Value="{AppThemeBinding Light={StaticResource FormAccentLight}, Dark={StaticResource FormAccentDark}}" />
+    </Style>
+
+    <Style TargetType="BoxView">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray950}, Dark={StaticResource Gray200}}" />
+    </Style>
+
+    <Style x:Key="FlatButton" TargetType="Button">
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="16,6"/>
+        <Setter Property="BorderColor" Value="{StaticResource Separator}"/>
+        <Setter Property="BorderWidth" Value="1"/>
+        <Setter Property="BackgroundColor" Value="Transparent"/>
+        <Setter Property="TextColor" Value="Black"/>
+    </Style>
+
+    <Style x:Key="FlatButtonSelected" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+        <Setter Property="BackgroundColor" Value="{StaticResource PrimaryBlue}"/>
+        <Setter Property="BorderColor" Value="{x:Null}"/>
+        <Setter Property="TextColor" Value="White"/>
+    </Style>
+
+
+    <Style x:Key="IconStyle" TargetType="Button">
+        <Style.Setters>
+            <Setter Property="FontFamily" Value="CalciteIcons" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeStandard}" />
+        </Style.Setters>
+    </Style>
+
+    <Style TargetType="Grid">
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Selected">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="LightBlue" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <!-- Border Style -->
+    <Style x:Key="PanelBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource SurfaceVariantBrush}" />
+        <Setter Property="Padding" Value="5" />
+        <Setter Property="Stroke" Value="{StaticResource BorderStrongBrush}" />
+        <Setter Property="StrokeThickness" Value="1" />
+    </Style>
+
+    <!-- Header Border Style -->
+    <Style x:Key="HeaderBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="Black" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <!-- Label Style -->
+    <Style x:Key="InfoHeaderLabelStyle" TargetType="Label">
+        <Setter Property="TextColor" Value="White" />
+    </Style>
+
+    <Style x:Key="EntryStyle" TargetType="Entry">
+        <Setter Property="WidthRequest" Value="100" />
+    </Style>
+
+    <!--Toggle: explicit on-tract and thumb colours so the pill and handle stay visible in dark mode-->
+    <Style TargetType="Switch">
+        <Setter Property="OnColor" Value="{AppThemeBinding Light={StaticResource ToggleOnLight}, Dark={StaticResource ToggleOnDark}}" />
+        <Setter Property="ThumbColor" Value="{AppThemeBinding Light={StaticResource OnSurfaceMutedLight}, Dark={StaticResource HeaderForegroundDark}}" />
+        <Style.Triggers>
+            <Trigger TargetType="Switch" Property="IsToggled" Value="True">
+                <Setter Property="ThumbColor" Value="{StaticResource White}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+</ResourceDictionary>

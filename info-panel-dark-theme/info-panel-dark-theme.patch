@@ -1,0 +1,270 @@
+--- a/Src/MiEditor.MainApp/Resources/Styles/Styles.xaml
++++ b/Src/MiEditor.MainApp/Resources/Styles/Styles.xaml
+@@ -94,9 +94,9 @@
+ 
+     <!-- Border Style -->
+     <Style x:Key="PanelBorderStyle" TargetType="Border">
+-        <Setter Property="Background" Value="WhiteSmoke" />
++        <Setter Property="Background" Value="{StaticResource SurfaceVariantBrush}" />
+         <Setter Property="Padding" Value="5" />
+-        <Setter Property="Stroke" Value="LightGray" />
++        <Setter Property="Stroke" Value="{StaticResource BorderStrongBrush}" />
+         <Setter Property="StrokeThickness" Value="1" />
+     </Style>
+ 
+@@ -115,11 +115,6 @@
+         <Setter Property="WidthRequest" Value="100" />
+     </Style>
+ 
+-    <Color x:Key="InfoTableGridBackgroundColor">#e0e9f8</Color>
+-    <Color x:Key="InfoTableHeaderBackgroundColor">LightGray</Color>
+-    <Color x:Key="InfoNodeBackgroundColor">#dae3f1</Color>
+-    <Color x:Key="TableBorderBackgroundColor">LightGray</Color>
+-
+     <!--Toggle: explicit on-tract and thumb colours so the pill and handle stay visible in dark mode-->
+     <Style TargetType="Switch">
+         <Setter Property="OnColor" Value="{AppThemeBinding Light={StaticResource ToggleOnLight}, Dark={StaticResource ToggleOnDark}}" />
+--- a/Src/MiEditor.Core/Services/AttributeInfo/IInfoAttributeHelper.cs
++++ b/Src/MiEditor.Core/Services/AttributeInfo/IInfoAttributeHelper.cs
+@@ -11,7 +11,7 @@
+         Border CreateStyledBorder(View content, Color? strokeColor = null, Thickness? margin = null);
+         Expander CreateExpander(View header, View? content = null, Thickness? padding = null);
+         TapGestureRecognizer CreateTapGesture(Action tappedAction);
+-        Border CreateTableCell(string text, bool isHeader, double borderThickness, Color? backgroundColor, int row, int column);
++        Border CreateTableCell(string text, bool isHeader, double borderThickness, Brush? background, int row, int column);
+         Graphic? CreateGraphic(ArcGISFeature feature, System.Drawing.Color color);
+     }
+ }
+--- a/Src/MiEditor.Core/Services/AttributeInfo/InfoAttributeHelper.cs
++++ b/Src/MiEditor.Core/Services/AttributeInfo/InfoAttributeHelper.cs
+@@ -11,19 +11,21 @@
+     [RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IInfoAttributeHelper) })]
+     public class InfoAttributeHelper : IInfoAttributeHelper
+     {
++        private const string BorderBrushKey = "BorderStrongBrush";
++
+         public Label CreateLabel(string text, 
+             double fontSize = 12, 
+             Thickness? margin = null, 
+             FontAttributes fontAttributes = FontAttributes.None, 
+             Thickness? padding = null)
+         {
+-            return new Label
++            return WithThemeText(new Label
+             {
+                 Text = text,
+                 FontSize = fontSize,
+                 Padding = padding ?? new Thickness(0),
+                 Margin = margin ?? new Thickness(0) // Default to no margin if null
+-            };
++            });
+         }
+ 
+         public Border CreateStyledBorder(View content, Color? strokeColor = null, Thickness? margin = null)
+@@ -40,21 +42,21 @@
+                 throw new InvalidOperationException("Application resources are not available.");
+             }
+ 
+-            if (!Application.Current.Resources.TryGetValue("TableBorderBackgroundColor", out var resourceValue))
++            if (!Application.Current.Resources.TryGetValue(BorderBrushKey, out var resourceValue))
+             {
+-                throw new InvalidOperationException("Resource 'TableBorderBackgroundColor' not found.");
++                throw new InvalidOperationException($"Resource '{BorderBrushKey}' not found.");
+             }
+ 
+-            if (resourceValue is not Color defaultStrokeColor)
++            if (resourceValue is not Brush defaultStroke)
+             {
+-                throw new InvalidOperationException("Resource 'TableBorderBackgroundColor' is not a Color.");
++                throw new InvalidOperationException($"Resource '{BorderBrushKey}' is not a Brush.");
+             }
+ 
+             return new Border
+             {
+                 Padding = 5,
+                 Margin = margin ?? new Thickness(0, 5),
+-                Stroke = strokeColor ?? defaultStrokeColor,
++                Stroke = strokeColor is null ? defaultStroke : (Brush)strokeColor,
+                 StrokeThickness = 1,
+                 Background = Colors.Transparent,
+                 Content = content
+@@ -83,20 +85,20 @@
+             return tap;
+         }
+ 
+-        public Border CreateTableCell(string text, bool isHeader, double borderThickness, Color? backgroundColor, int row, int column)
++        public Border CreateTableCell(string text, bool isHeader, double borderThickness, Brush? background, int row, int column)
+         {
+             var cell = new Border
+             {
+-                Stroke = Colors.Black,
++                Stroke = (Brush)Application.Current!.Resources[BorderBrushKey],
+                 StrokeThickness = borderThickness,
+-                Background = backgroundColor ?? Colors.Transparent,
+-                Content = new Label
++                Background = background ?? Colors.Transparent,
++                Content = WithThemeText(new Label
+                 {
+                     Text = text,
+                     FontAttributes = isHeader ? FontAttributes.Bold : FontAttributes.None,
+                     FontSize = 12,
+                     Padding = 5
+-                }
++                })
+             };
+             Grid.SetRow(cell, row);
+             Grid.SetColumn(cell, column);
+@@ -125,5 +127,12 @@
+                 return null;
+             }
+         }
++
++        private static Label WithThemeText(Label label)
++        {
++            var resources = Application.Current!.Resources;
++            label.SetAppThemeColor(Label.TextColorProperty, (Color)resources["OnSurfaceLight"], (Color)resources["OnSurfaceDark"]);
++            return label;
++        }
+     }
+ }
+--- a/Src/MiEditor.MainApp/ViewModels/Info/LoadAttributeDetailViewModel.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Info/LoadAttributeDetailViewModel.cs
+@@ -16,8 +16,8 @@
+     IAttachmentViewModelFactory attachmentFactory,
+     IJsonUtilityService jsonUtilityService) : ObservableObject
+ {
+-    private const string Info_Table_Grid_Background_Color = "InfoTableGridBackgroundColor";
+-    private const string Info_Table_Header_Background_Color = "InfoTableHeaderBackgroundColor";
++    private const string Info_Table_Grid_Background_Brush = "SubformBackgroundBrush";
++    private const string Info_Table_Header_Background_Brush = "ToolStripBrush";
+ 
+     private readonly TimeZoneInfo BstZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
+ 
+@@ -122,15 +122,15 @@
+             },
+             RowSpacing = 0,
+             Padding = new Thickness(0),
+-            BackgroundColor = GetColorByResource(Info_Table_Grid_Background_Color)
++            Background = GetBrushByResource(Info_Table_Grid_Background_Brush)
+         };
+ 
+         int rowIndex = 0;
+ 
+         // Header row
+         tableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+-        tableGrid.Children.Add(infoAttributeHelper.CreateTableCell("Name", true, 0.2, GetColorByResource(Info_Table_Header_Background_Color), rowIndex, 0));
+-        tableGrid.Children.Add(infoAttributeHelper.CreateTableCell("Value", true, 0.2, GetColorByResource(Info_Table_Header_Background_Color), rowIndex, 1));
++        tableGrid.Children.Add(infoAttributeHelper.CreateTableCell("Name", true, 0.2, GetBrushByResource(Info_Table_Header_Background_Brush), rowIndex, 0));
++        tableGrid.Children.Add(infoAttributeHelper.CreateTableCell("Value", true, 0.2, GetBrushByResource(Info_Table_Header_Background_Brush), rowIndex, 1));
+         rowIndex++;
+ 
+         // Data rows
+@@ -152,7 +152,7 @@
+ 
+         if (additionalInfos != null)
+         {
+-            var headerRow = infoAttributeHelper.CreateTableCell("Additional Attributes", true, 0.2, GetColorByResource(Info_Table_Header_Background_Color), tableGrid.RowDefinitions.Count + 1, 0);
++            var headerRow = infoAttributeHelper.CreateTableCell("Additional Attributes", true, 0.2, GetBrushByResource(Info_Table_Header_Background_Brush), tableGrid.RowDefinitions.Count + 1, 0);
+ 
+             AddContentRow(headerRow, tableGrid, tableGrid.RowDefinitions.Count + 1);
+ 
+@@ -171,7 +171,7 @@
+                 var vm = attachmentFactory.Create(attachment);
+                 AttachmentItems.Add(vm);
+             }
+-            var headerRow = infoAttributeHelper.CreateTableCell($"Attachments ({attachments.Count})", true, 0.2, GetColorByResource(Info_Table_Header_Background_Color), tableGrid.RowDefinitions.Count + 1, 0);
++            var headerRow = infoAttributeHelper.CreateTableCell($"Attachments ({attachments.Count})", true, 0.2, GetBrushByResource(Info_Table_Header_Background_Brush), tableGrid.RowDefinitions.Count + 1, 0);
+ 
+             AddContentRow(headerRow, tableGrid, tableGrid.RowDefinitions.Count + 1);
+ 
+@@ -222,7 +222,7 @@
+             },
+             RowSpacing = 0,
+             Padding = new Thickness(0),
+-            BackgroundColor = GetColorByResource(Info_Table_Grid_Background_Color)
++            Background = GetBrushByResource(Info_Table_Grid_Background_Brush)
+         };
+ 
+         additionaInfoGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+@@ -238,6 +238,6 @@
+         return additionaInfoGrid;
+     }
+ 
+-    private static Color GetColorByResource(string resourceName) =>
+-        (Color)Application.Current!.Resources[resourceName];
++    private static Brush GetBrushByResource(string resourceName) =>
++        (Brush)Application.Current!.Resources[resourceName];
+ }
+--- a/Src/MiEditor.MainApp/Controls/Map/InfoAttributePanel.xaml.cs
++++ b/Src/MiEditor.MainApp/Controls/Map/InfoAttributePanel.xaml.cs
+@@ -25,7 +25,7 @@
+     IRecipient<EditingSessionInProgressMessage>,
+     IRecipient<MeasurementInProgressMessage>
+ {
+-    private const string INFO_NODE_BACKGROUND_COLOR = "InfoNodeBackgroundColor";
++    private const string INFO_NODE_BACKGROUND_BRUSH = "ToolButtonActiveBrush";
+     private const string INOF_GRAPHIC_OVERLAY = "infoGraphisOverly";
+     private const string LPIS_LAYER_NAME = "LPIS";
+ 
+@@ -264,7 +264,7 @@
+ 
+         if (borderMap.TryGetValue(firstChild.DisplayId, out var selectedBorder))
+         {
+-            selectedBorder.BackgroundColor = (Color)Application.Current!.Resources[INFO_NODE_BACKGROUND_COLOR];
++            selectedBorder.Background = (Brush)Application.Current!.Resources[INFO_NODE_BACKGROUND_BRUSH];
+         }
+ 
+         await LoadAttributesToRightPanel(firstChild.Parent, firstChild.LayerName, firstChild.DisplayId);
+@@ -329,7 +329,7 @@
+         if (IsLpisGroup(group))
+         {
+             expander.IsExpanded = true;
+-            mainBorder.Background = (Color)Application.Current!.Resources[INFO_NODE_BACKGROUND_COLOR];
++            mainBorder.Background = (Brush)Application.Current!.Resources[INFO_NODE_BACKGROUND_BRUSH];
+         }
+     }
+ 
+@@ -343,7 +343,7 @@
+             if (e.PropertyName == nameof(Expander.IsExpanded))
+             {
+                 mainBorder.Background = expander.IsExpanded
+-                    ? (Color)Application.Current!.Resources[INFO_NODE_BACKGROUND_COLOR]
++                    ? (Brush)Application.Current!.Resources[INFO_NODE_BACKGROUND_BRUSH]
+                     : Colors.Transparent;
+             }
+         };
+@@ -410,10 +410,10 @@
+             {
+                 // Clear all highlights
+                 foreach (var f in borderMap.Values)
+-                    f.BackgroundColor = Colors.Transparent;
++                    f.Background = Colors.Transparent;
+ 
+                 // Highlight selected
+-                border.BackgroundColor = (Color)Application.Current!.Resources[INFO_NODE_BACKGROUND_COLOR];
++                border.Background = (Brush)Application.Current!.Resources[INFO_NODE_BACKGROUND_BRUSH];
+                 await LoadAttributesToRightPanel(node.Parent, node.LayerName, node.DisplayId);
+                 HighlightFeature(node.Parent);
+             }));
+@@ -429,7 +429,7 @@
+     {
+         if (node.Parent != null && IsLpisNode(node) && !lpisNodeExpanded)
+         {
+-            border.BackgroundColor = (Color)Application.Current!.Resources[INFO_NODE_BACKGROUND_COLOR];
++            border.Background = (Brush)Application.Current!.Resources[INFO_NODE_BACKGROUND_BRUSH];
+             await LoadAttributesToRightPanel(node.Parent, node.LayerName, node.DisplayId);
+             HighlightFeature(node.Parent);
+         }
+@@ -575,10 +575,10 @@
+             {
+                 // Clear all highlights
+                 foreach (var f in borderMap.Values)
+-                    f.BackgroundColor = Colors.Transparent;
++                    f.Background = Colors.Transparent;
+ 
+                 // Highlight selected
+-                border.BackgroundColor = (Color)Application.Current!.Resources[INFO_NODE_BACKGROUND_COLOR];
++                border.Background = (Brush)Application.Current!.Resources[INFO_NODE_BACKGROUND_BRUSH];
+                 if (child.Parent != null)
+                 {
+                     await LoadAttributesToRightPanel(child.Parent, child.LayerName, child.DisplayId);
