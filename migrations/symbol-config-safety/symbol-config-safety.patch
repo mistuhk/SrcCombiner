@@ -1,0 +1,865 @@
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/DrawingSymbolColourParserService.cs b/Src/MiEditor.Core/Services/Drawing/DrawingSymbolColourParserService.cs
+--- a/Src/MiEditor.Core/Services/Drawing/DrawingSymbolColourParserService.cs
++++ b/Src/MiEditor.Core/Services/Drawing/DrawingSymbolColourParserService.cs
+@@ -1,50 +1,231 @@
+-
+ using System.Globalization;
++using Esri.ArcGISRuntime.Symbology;
++using WG.MiEditor.Logging.Abstractions;
+ using WG.MiEditor.Models.Drawing;
+ using WG.MiEditor.Shared.AutoScanning;
+ using Colour = System.Drawing.Color;
+ 
+ namespace WG.MiEditor.Core.Services.Drawing;
+ 
++/// <summary>
++/// Turns the drawing symbol settings (drawingsymbols.json) into colours, styles and symbols.
++/// Nothing here throws on bad or missing configuration: each problem logs a warning and a
++/// default is used, so a config mistake shows up as an odd-looking symbol, not a broken tool.
++/// </summary>
+ public interface IDrawingSymbolColourParser
+ {
+-    Colour FromSetting(ColourSetting setting);
++    /// <summary>
++    /// Converts a configured colour. A missing or malformed value logs a warning and falls back to
++    /// the setting's ARGB value if it has one, otherwise to black.
++    /// </summary>
++    Colour FromSetting(ColourSetting? setting);
++
++    /// <inheritdoc cref="FromSetting(ColourSetting?)"/>
++    /// <param name="fallback">Used instead of black when nothing usable is configured.</param>
++    Colour FromSetting(ColourSetting? setting, Colour fallback);
++
++    /// <summary>
++    /// Converts a configured symbol style name (for example "Solid" or "Circle"), ignoring case and
++    /// surrounding whitespace. A missing or unknown name logs a warning and returns
++    /// <paramref name="fallback"/>.
++    /// </summary>
++    TStyle StyleFromSetting<TStyle>(string? style, TStyle fallback) where TStyle : struct, Enum;
++
++    /// <summary>
++    /// Returns a configured size or width if it is a finite number greater than zero; otherwise
++    /// logs a warning and returns <paramref name="fallback"/>. A missing number in the config binds
++    /// as 0, which would draw nothing.
++    /// </summary>
++    double SizeFromSetting(double? size, double fallback);
++
++    /// <summary>Builds a point symbol. A missing section gives a default symbol, with a warning.</summary>
++    SimpleMarkerSymbol MarkerSymbol(PointSymbolSetting? setting, string settingName);
++
++    /// <summary>Builds a line symbol. A missing section gives a default symbol, with a warning.</summary>
++    SimpleLineSymbol LineSymbol(LineSymbolSetting? setting, string settingName);
++
++    /// <summary>
++    /// Builds a polygon symbol, including its outline. A missing section gives a default symbol,
++    /// with a warning; the default fill is translucent so it never hides the map underneath.
++    /// </summary>
++    SimpleFillSymbol FillSymbol(PolygonSymbolSetting? setting, string settingName);
+ }
+ 
+ [RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IDrawingSymbolColourParser) })]
+-public class DrawingSymbolColourParserService : IDrawingSymbolColourParser
++public class DrawingSymbolColourParserService(ILoggerService logger) : IDrawingSymbolColourParser
+ {
+-    public Colour FromSetting(ColourSetting setting)
++    public static readonly Colour Fallback = Colour.Black;
++    public static readonly Colour FallbackFill = Colour.FromArgb(64, 0, 0, 0);
++    public const SimpleMarkerSymbolStyle FallbackMarkerStyle = SimpleMarkerSymbolStyle.Circle;
++    public const SimpleLineSymbolStyle FallbackLineStyle = SimpleLineSymbolStyle.Solid;
++    public const SimpleFillSymbolStyle FallbackFillStyle = SimpleFillSymbolStyle.Solid;
++    public const double FallbackMarkerSize = 10;
++    public const double FallbackLineWidth = 2;
++
++    // ---- Colours ---------------------------------------------------------------------------
++
++    public Colour FromSetting(ColourSetting? setting) => ParseColour(setting, Fallback, settingName: null);
++
++    public Colour FromSetting(ColourSetting? setting, Colour fallback) => ParseColour(setting, fallback, settingName: null);
++
++    private Colour ParseColour(ColourSetting? setting, Colour fallback, string? settingName)
+     {
++        if (setting is null)
++        {
++            Warn($"{Describe("colour", settingName)} is missing; using {Name(fallback)}.");
++            return fallback;
++        }
++
+         if (!string.IsNullOrWhiteSpace(setting.Hex))
+         {
+-            return FromHex(setting.Hex);
++            if (TryParseHex(setting.Hex, out var colour))
++            {
++                return colour;
++            }
++
++            Warn($"{Describe("colour", settingName)} '{setting.Hex}' is not a valid #RRGGBB or #AARRGGBB value; " +
++                 (setting.Argb is null ? $"using {Name(fallback)}." : "using its ARGB value instead."));
+         }
+ 
+-        if (setting.Argb != null)
++        if (setting.Argb is { } argb)
+         {
+-            return Colour.FromArgb(setting.Argb.A, setting.Argb.R, setting.Argb.G, setting.Argb.B);
++            return Colour.FromArgb(argb.A, argb.R, argb.G, argb.B);
+         }
+ 
+-        return Colour.Black;
++        return fallback;
+     }
+ 
+-    private static Colour FromHex(string hex)
++    /// <summary>Accepts RRGGBB or AARRGGBB, with or without a leading '#', ignoring surrounding whitespace.</summary>
++    public static bool TryParseHex(string? hex, out Colour colour)
+     {
+-        hex = hex.Replace("#", "");
+-        if (hex.Length == 6)
++        colour = Fallback;
++        if (string.IsNullOrWhiteSpace(hex)) return false;
++
++        var digits = hex.Trim();
++        if (digits.StartsWith('#')) digits = digits[1..];
++
++        if (digits.Length is not (6 or 8) ||
++            !uint.TryParse(digits, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var value))
+         {
+-            return Colour.FromArgb(255,
+-                int.Parse(hex.Substring(0, 2), NumberStyles.HexNumber),
+-                int.Parse(hex.Substring(2, 2), NumberStyles.HexNumber),
+-                int.Parse(hex.Substring(4, 2), NumberStyles.HexNumber));
++            return false;
+         }
+ 
+-        return Colour.FromArgb(
+-            int.Parse(hex.Substring(0, 2), NumberStyles.HexNumber),
+-            int.Parse(hex.Substring(2, 2), NumberStyles.HexNumber),
+-            int.Parse(hex.Substring(4, 2), NumberStyles.HexNumber),
+-            int.Parse(hex.Substring(6, 2), NumberStyles.HexNumber));
++        if (digits.Length == 6)
++        {
++            value |= 0xFF000000; // no alpha given: fully opaque
++        }
++
++        colour = Colour.FromArgb(unchecked((int)value));
++        return true;
+     }
+ 
++    // ---- Styles ----------------------------------------------------------------------------
++
++    public TStyle StyleFromSetting<TStyle>(string? style, TStyle fallback) where TStyle : struct, Enum =>
++        ParseStyle(style, fallback, settingName: null);
++
++    private TStyle ParseStyle<TStyle>(string? style, TStyle fallback, string? settingName) where TStyle : struct, Enum
++    {
++        if (TryParseStyle<TStyle>(style, out var parsed))
++        {
++            return parsed;
++        }
++
++        Warn($"{Describe("style", settingName)} '{style}' is not a valid {typeof(TStyle).Name}; using {fallback}.");
++        return fallback;
++    }
++
++    /// <summary>
++    /// Accepts only a single defined name. Numbers and comma lists are rejected because
++    /// Enum.TryParse would otherwise accept "99" or "Solid,Dash" as some arbitrary value.
++    /// </summary>
++    public static bool TryParseStyle<TStyle>(string? style, out TStyle parsed) where TStyle : struct, Enum
++    {
++        parsed = default;
++        if (string.IsNullOrWhiteSpace(style)) return false;
++
++        var name = style.Trim();
++        return !char.IsDigit(name[0]) && name[0] is not ('-' or '+') && !name.Contains(',') &&
++               Enum.TryParse(name, ignoreCase: true, out parsed) &&
++               Enum.IsDefined(parsed);
++    }
++
++    // ---- Sizes -----------------------------------------------------------------------------
++
++    public double SizeFromSetting(double? size, double fallback) => ParseSize(size, fallback, settingName: null);
++
++    private double ParseSize(double? size, double fallback, string? settingName)
++    {
++        if (size is { } value && double.IsFinite(value) && value > 0)
++        {
++            return value;
++        }
++
++        Warn($"{Describe("size", settingName)} '{size}' is not a positive number; using {fallback}.");
++        return fallback;
++    }
++
++    // ---- Symbols ---------------------------------------------------------------------------
++
++    public SimpleMarkerSymbol MarkerSymbol(PointSymbolSetting? setting, string settingName)
++    {
++        if (setting is null)
++        {
++            WarnMissingSection(settingName);
++            return new SimpleMarkerSymbol(FallbackMarkerStyle, Fallback, FallbackMarkerSize);
++        }
++
++        return new SimpleMarkerSymbol(
++            ParseStyle(setting.Style, FallbackMarkerStyle, $"{settingName}.Style"),
++            ParseColour(setting.Colour, Fallback, $"{settingName}.Colour"),
++            ParseSize(setting.Size, FallbackMarkerSize, $"{settingName}.Size"));
++    }
++
++    public SimpleLineSymbol LineSymbol(LineSymbolSetting? setting, string settingName)
++    {
++        if (setting is null)
++        {
++            WarnMissingSection(settingName);
++            return new SimpleLineSymbol(FallbackLineStyle, Fallback, FallbackLineWidth);
++        }
++
++        return new SimpleLineSymbol(
++            ParseStyle(setting.Style, FallbackLineStyle, $"{settingName}.Style"),
++            ParseColour(setting.Colour, Fallback, $"{settingName}.Colour"),
++            ParseSize(setting.Width, FallbackLineWidth, $"{settingName}.Width"));
++    }
++
++    public SimpleFillSymbol FillSymbol(PolygonSymbolSetting? setting, string settingName)
++    {
++        if (setting is null)
++        {
++            WarnMissingSection(settingName);
++            return new SimpleFillSymbol(
++                FallbackFillStyle,
++                FallbackFill,
++                new SimpleLineSymbol(FallbackLineStyle, Fallback, FallbackLineWidth));
++        }
++
++        return new SimpleFillSymbol(
++            ParseStyle(setting.FillStyle, FallbackFillStyle, $"{settingName}.FillStyle"),
++            ParseColour(setting.FillColour, FallbackFill, $"{settingName}.FillColour"),
++            LineSymbol(setting.Outline, $"{settingName}.Outline"));
++    }
++
++    // ---- Warnings --------------------------------------------------------------------------
++
++    private void WarnMissingSection(string settingName) =>
++        Warn($"Drawing symbol setting '{settingName}' is missing from the configuration; using a default symbol.");
++
++    private static string Describe(string what, string? settingName) =>
++        settingName is null ? $"Drawing symbol {what}" : $"Drawing symbol setting '{settingName}'";
++
++    private static string Name(Colour colour) =>
++        colour.IsNamedColor ? colour.Name : $"#{colour.A:X2}{colour.R:X2}{colour.G:X2}{colour.B:X2}";
++
++    private void Warn(string message)
++    {
++        // A failing logger must not turn a bad setting back into a crash.
++        try { logger.Warn(message); } catch { /* ignored */ }
++    }
+ }
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddLineOperation.cs b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddLineOperation.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddLineOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddLineOperation.cs
+@@ -54,11 +54,7 @@
+         this.addFeatureService = addFeatureService;
+         this.notificationManager = notificationManager;
+ 
+-        var settings = symbolSettings.Value.Line;
+-        var style = Enum.Parse<SimpleLineSymbolStyle>(settings.Style, true);
+-        var colour = parser.FromSetting(settings.Colour);
+-
+-        finalGraphicSymbol = new SimpleLineSymbol(style, colour, settings.Width);
++        finalGraphicSymbol = parser.LineSymbol(symbolSettings.Value.Line, "Line");
+         lpisPlyLayerName = appSettings.Layers.LPIS_Poly;
+ 
+         messenger.Register<AddLineOperation, ClearEditingGraphicMessage>(this, (r, m) => r.Receive(m));
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddPointOperation.cs b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddPointOperation.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddPointOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddPointOperation.cs
+@@ -53,11 +53,7 @@
+         this.addFeatureService = addFeatureService;
+         this.notificationManager = notificationManager;
+ 
+-        var settings = symbolSettings.Value.Point;
+-        var style = Enum.Parse<SimpleMarkerSymbolStyle>(settings.Style, true);
+-        var colour = drawingSymbolColourParser.FromSetting(settings.Colour);
+-
+-        finalGraphicSymbol = new SimpleMarkerSymbol(style, colour, settings.Size);
++        finalGraphicSymbol = drawingSymbolColourParser.MarkerSymbol(symbolSettings.Value.Point, "Point");
+         lpisPlyLayerName = appSettings.Layers.LPIS_Poly;
+ 
+         messenger.Register<AddPointOperation, ClearEditingGraphicMessage>(this, (r, m) => r.Receive(m));
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddPolygonOperation.cs b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddPolygonOperation.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddPolygonOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddPolygonOperation.cs
+@@ -56,14 +56,7 @@
+         this.notificationManager = notificationManager;
+         this.geometryClippingService = lpisClippingService;
+ 
+-        var settings = symbolSettings.Value.Polygon;
+-        var outlineStyle = Enum.Parse<SimpleLineSymbolStyle>(settings.Outline.Style, true);
+-        var outlineColour = drawingSymbolColourParser.FromSetting(settings.Outline.Colour);
+-        var outlineSymbol = new SimpleLineSymbol(outlineStyle, outlineColour, settings.Outline.Width);
+-        var fillStyle = Enum.Parse<SimpleFillSymbolStyle>(settings.FillStyle, true);
+-        var fillColour = drawingSymbolColourParser.FromSetting(settings.FillColour);
+-
+-        finalGraphicSymbol = new SimpleFillSymbol(fillStyle, fillColour, outlineSymbol);
++        finalGraphicSymbol = drawingSymbolColourParser.FillSymbol(symbolSettings.Value.Polygon, "Polygon");
+         lpisPlyLayerName = appSettings.Layers.LPIS_Poly;
+ 
+         messenger.Register<AddPolygonOperation, ClearEditingGraphicMessage>(this, (r, m) => r.Receive(m));
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchLineOperation.cs b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchLineOperation.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchLineOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchLineOperation.cs
+@@ -55,11 +55,7 @@
+         this.addFeatureService = addFeatureService;
+         this.notificationManager = notificationManager;
+ 
+-        var settings = symbolSettings.Value.InFieldSketchLine;
+-        var style = Enum.Parse<SimpleLineSymbolStyle>(settings.Style, true);
+-        var colour = parser.FromSetting(settings.Colour);
+-
+-        finalGraphicSymbol = new SimpleLineSymbol(style, colour, settings.Width);
++        finalGraphicSymbol = parser.LineSymbol(symbolSettings.Value.InFieldSketchLine, "InFieldSketchLine");
+         infieldSketchLayer = layerSettings.Name;
+ 
+         messenger.Register<AddSketchLineOperation, ClearEditingGraphicMessage>(this, (r, m) => r.Receive(m));
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPointOperation.cs b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPointOperation.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPointOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPointOperation.cs
+@@ -52,11 +52,7 @@
+         this.addFeatureService = addFeatureService;
+         this.notificationManager = notificationManager;
+ 
+-        var settings = symbolSettings.Value.Point;
+-        var style = Enum.Parse<SimpleMarkerSymbolStyle>(settings.Style, true);
+-        var colour = drawingSymbolColourParser.FromSetting(settings.Colour);
+-
+-        finalGraphicSymbol = new SimpleMarkerSymbol(style, colour, settings.Size);
++        finalGraphicSymbol = drawingSymbolColourParser.MarkerSymbol(symbolSettings.Value.Point, "Point");
+         miSketchLayer = layerSettings.Name;
+ 
+         messenger.Register<AddSketchPointOperation, ClearEditingGraphicMessage>(this, (r, m) => r.Receive(m));
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPolygonOperation.cs b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPolygonOperation.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPolygonOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPolygonOperation.cs
+@@ -52,16 +52,7 @@
+         this.addFeatureService = addFeatureService;
+         this.notificationManager = notificationManager;
+ 
+-        var settings = symbolSettings.Value.InFieldSketchPolygon;
+-
+-        var outlineStyle = Enum.Parse<SimpleLineSymbolStyle>(settings.Outline.Style, true);
+-        var outlineColour = drawingSymbolColourParser.FromSetting(settings.Outline.Colour);
+-        var outlineSymbol = new SimpleLineSymbol(outlineStyle, outlineColour, settings.Outline.Width);
+-
+-        var fillStyle = Enum.Parse<SimpleFillSymbolStyle>(settings.FillStyle, true);
+-        var fillColour = drawingSymbolColourParser.FromSetting(settings.FillColour);
+-
+-        finalGraphicSymbol = new SimpleFillSymbol(fillStyle, fillColour, outlineSymbol);
++        finalGraphicSymbol = drawingSymbolColourParser.FillSymbol(symbolSettings.Value.InFieldSketchPolygon, "InFieldSketchPolygon");
+         miSketchLayer = layerSettings.Name;
+ 
+         messenger.Register<AddSketchPolygonOperation, ClearEditingGraphicMessage>(this, (r, m) => r.Receive(m));
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddTechnicalAssessmentPolygonOperation.cs b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddTechnicalAssessmentPolygonOperation.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddTechnicalAssessmentPolygonOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddTechnicalAssessmentPolygonOperation.cs
+@@ -53,14 +53,7 @@
+         this.geometryAreaHelper = geometryAreaHelper;
+         this.messenger = messenger;
+ 
+-        var settings = symbolSettings.Value.Polygon;
+-        var outlineStyle = Enum.Parse<SimpleLineSymbolStyle>(settings.Outline.Style, true);
+-        var outlineColour = drawingSymbolColourParser.FromSetting(settings.Outline.Colour);
+-        var outlineSymbol = new SimpleLineSymbol(outlineStyle, outlineColour, settings.Outline.Width);
+-        var fillStyle = Enum.Parse<SimpleFillSymbolStyle>(settings.FillStyle, true);
+-        var fillColour = drawingSymbolColourParser.FromSetting(settings.FillColour);
+-
+-        finalGraphicSymbol = new SimpleFillSymbol(fillStyle, fillColour, outlineSymbol);
++        finalGraphicSymbol = drawingSymbolColourParser.FillSymbol(symbolSettings.Value.Polygon, "Polygon");
+         this.messenger.Register<AddTechnicalAssessmentPolygonOperation, ClearEditingGraphicMessage>(this, (r, m) => r.Receive(m));
+     }
+ 
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/BufferFeature/AddBufferService.cs b/Src/MiEditor.Core/Services/Drawing/Editing/BufferFeature/AddBufferService.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/BufferFeature/AddBufferService.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/BufferFeature/AddBufferService.cs
+@@ -103,29 +103,15 @@
+             {
+                 case GeometryType.Point:
+                     var pointSettings = isSketch ? drawingSymbolsSettings.InFieldSketchPoint : drawingSymbolsSettings.Point;
+-                    return new SimpleMarkerSymbol(
+-                        Enum.Parse<SimpleMarkerSymbolStyle>(pointSettings.Style, true),
+-                        symbolColourParser.FromSetting(pointSettings.Colour),
+-                        pointSettings.Size);
++                    return symbolColourParser.MarkerSymbol(pointSettings, isSketch ? "InFieldSketchPoint" : "Point");
+ 
+                 case GeometryType.Polyline:
+                     var lineSettings = isSketch ? drawingSymbolsSettings.InFieldSketchLine : drawingSymbolsSettings.Line;
+-                    return new SimpleLineSymbol(
+-                        Enum.Parse<SimpleLineSymbolStyle>(lineSettings.Style, true),
+-                        symbolColourParser.FromSetting(lineSettings.Colour),
+-                        lineSettings.Width);
++                    return symbolColourParser.LineSymbol(lineSettings, isSketch ? "InFieldSketchLine" : "Line");
+ 
+                 case GeometryType.Polygon:
+                     var polygonSettings = isSketch ? drawingSymbolsSettings.InFieldSketchPolygon : drawingSymbolsSettings.Polygon;
+-                    var outlineSymbol = new SimpleLineSymbol(
+-                        Enum.Parse<SimpleLineSymbolStyle>(polygonSettings.Outline.Style, true),
+-                        symbolColourParser.FromSetting(polygonSettings.Outline.Colour),
+-                        polygonSettings.Outline.Width);
+-
+-                    return new SimpleFillSymbol(
+-                        Enum.Parse<SimpleFillSymbolStyle>(polygonSettings.FillStyle, true),
+-                        symbolColourParser.FromSetting(polygonSettings.FillColour),
+-                        outlineSymbol);
++                    return symbolColourParser.FillSymbol(polygonSettings, isSketch ? "InFieldSketchPolygon" : "Polygon");
+                 default:
+                     return new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Circle, System.Drawing.Color.Red, 10);
+             }
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/IFeatureHighlightService.cs b/Src/MiEditor.Core/Services/Drawing/Editing/IFeatureHighlightService.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/IFeatureHighlightService.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/IFeatureHighlightService.cs
+@@ -91,29 +91,15 @@
+         {
+             case GeometryType.Point:
+                 var pointSettings = symbolSettings.Point;
+-                return new SimpleMarkerSymbol(
+-                    Enum.Parse<SimpleMarkerSymbolStyle>(pointSettings.Style, true),
+-                    symbolColourParser.FromSetting(pointSettings.Colour),
+-                    pointSettings.Size);
++                return symbolColourParser.MarkerSymbol(pointSettings, "Point");
+ 
+             case GeometryType.Polyline:
+                 var lineSettings = symbolSettings.Line;
+-                return new SimpleLineSymbol(
+-                    Enum.Parse<SimpleLineSymbolStyle>(lineSettings.Style, true),
+-                    symbolColourParser.FromSetting(lineSettings.Colour),
+-                    lineSettings.Width);
++                return symbolColourParser.LineSymbol(lineSettings, "Line");
+ 
+             case GeometryType.Polygon:
+                 var polygonSettings = symbolSettings.Polygon;
+-                var outlineSymbol = new SimpleLineSymbol(
+-                    Enum.Parse<SimpleLineSymbolStyle>(polygonSettings.Outline.Style, true),
+-                    symbolColourParser.FromSetting(polygonSettings.Outline.Colour),
+-                    polygonSettings.Outline.Width);
+-
+-                return new SimpleFillSymbol(
+-                    Enum.Parse<SimpleFillSymbolStyle>(polygonSettings.FillStyle, true),
+-                    symbolColourParser.FromSetting(polygonSettings.FillColour),
+-                    outlineSymbol);
++                return symbolColourParser.FillSymbol(polygonSettings, "Polygon");
+ 
+             default:
+                 return new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Cross, System.Drawing.Color.Red, 12);
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/ImportFeature/ImportGraphicsService.cs b/Src/MiEditor.Core/Services/Drawing/Editing/ImportFeature/ImportGraphicsService.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/ImportFeature/ImportGraphicsService.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/ImportFeature/ImportGraphicsService.cs
+@@ -117,35 +117,21 @@
+                     ? drawingSymbolsSettings.InFieldSketchPoint
+                     : drawingSymbolsSettings.Point;
+ 
+-                return new SimpleMarkerSymbol(
+-                    Enum.Parse<SimpleMarkerSymbolStyle>(pointSettings.Style, true),
+-                    symbolColourParser.FromSetting(pointSettings.Colour),
+-                    pointSettings.Size);
++                return symbolColourParser.MarkerSymbol(pointSettings, isSketch ? "InFieldSketchPoint" : "Point");
+ 
+             case GeometryType.Polyline:
+                 var lineSettings = isSketch
+                     ? drawingSymbolsSettings.InFieldSketchLine
+                     : drawingSymbolsSettings.Line;
+ 
+-                return new SimpleLineSymbol(
+-                    Enum.Parse<SimpleLineSymbolStyle>(lineSettings.Style, true),
+-                    symbolColourParser.FromSetting(lineSettings.Colour),
+-                    lineSettings.Width);
++                return symbolColourParser.LineSymbol(lineSettings, isSketch ? "InFieldSketchLine" : "Line");
+ 
+             case GeometryType.Polygon:
+                 var polygonSettings = isSketch
+                     ? drawingSymbolsSettings.InFieldSketchPolygon
+                     : drawingSymbolsSettings.Polygon;
+ 
+-                var outlineSymbol = new SimpleLineSymbol(
+-                    Enum.Parse<SimpleLineSymbolStyle>(polygonSettings.Outline.Style, true),
+-                    symbolColourParser.FromSetting(polygonSettings.Outline.Colour),
+-                    polygonSettings.Outline.Width);
+-
+-                return new SimpleFillSymbol(
+-                    Enum.Parse<SimpleFillSymbolStyle>(polygonSettings.FillStyle, true),
+-                    symbolColourParser.FromSetting(polygonSettings.FillColour),
+-                    outlineSymbol);
++                return symbolColourParser.FillSymbol(polygonSettings, isSketch ? "InFieldSketchPolygon" : "Polygon");
+ 
+             default:
+                 return new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Circle, System.Drawing.Color.Red, 10);
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Operations/MovePointOperation.cs b/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Operations/MovePointOperation.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Operations/MovePointOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/MoveFeatures/Operations/MovePointOperation.cs
+@@ -61,10 +61,8 @@
+ 
+         messenger.Register<MovePointOperation, ClearEditingGraphicMessage>(this, (r, m) => r.Receive(m));
+ 
+-        var pointSettings = symbolSettings.Value.PointSelectedSymbol;
+-        var rollBcakSettings = symbolSettings.Value.SelectedVertexSymbol;
+-        SelectedVertexSymbol = new SimpleMarkerSymbol(Enum.Parse<SimpleMarkerSymbolStyle>(pointSettings.Style, true), drawingSymbolColourParser.FromSetting(pointSettings.Colour), pointSettings.Size);
+-        RollbackVertexSymbol = new SimpleMarkerSymbol(Enum.Parse<SimpleMarkerSymbolStyle>(rollBcakSettings.Style, true), drawingSymbolColourParser.FromSetting(rollBcakSettings.Colour), rollBcakSettings.Size);
++        SelectedVertexSymbol = drawingSymbolColourParser.MarkerSymbol(symbolSettings.Value.PointSelectedSymbol, "PointSelectedSymbol");
++        RollbackVertexSymbol = drawingSymbolColourParser.MarkerSymbol(symbolSettings.Value.SelectedVertexSymbol, "SelectedVertexSymbol");
+     
+     }
+ 
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/Selection/Operation/Strategies/DragSelectionStrategy.cs b/Src/MiEditor.Core/Services/Drawing/Editing/Selection/Operation/Strategies/DragSelectionStrategy.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/Selection/Operation/Strategies/DragSelectionStrategy.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/Selection/Operation/Strategies/DragSelectionStrategy.cs
+@@ -32,8 +32,15 @@
+         this.loggerService = loggerService;
+ 
+         var settings = symbolSettings.Value.MultiFeatureSelection;
+-        var outline = new SimpleLineSymbol(SimpleLineSymbolStyle.Dash, colourParser.FromSetting(settings.Outline.Colour), settings.Outline.Width);
+-        dragSelectionSymbol = new SimpleFillSymbol(SimpleFillSymbolStyle.Solid, colourParser.FromSetting(settings.FillColour), outline);
++        // The drag box always draws dashed and solid-filled; only colours and width come from config.
++        var outline = new SimpleLineSymbol(
++            SimpleLineSymbolStyle.Dash,
++            colourParser.FromSetting(settings?.Outline?.Colour),
++            colourParser.SizeFromSetting(settings?.Outline?.Width, DrawingSymbolColourParserService.FallbackLineWidth));
++        dragSelectionSymbol = new SimpleFillSymbol(
++            SimpleFillSymbolStyle.Solid,
++            colourParser.FromSetting(settings?.FillColour, DrawingSymbolColourParserService.FallbackFill),
++            outline);
+     }
+ 
+     public override void Start(MapView mapView, GraphicsOverlay graphicsOverlay, Func<Geometry, bool, Task> onSelectionCompleteAsync)
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/VertexManagement/Operation/VertexManagementOperationBase.cs b/Src/MiEditor.Core/Services/Drawing/Editing/VertexManagement/Operation/VertexManagementOperationBase.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/VertexManagement/Operation/VertexManagementOperationBase.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/VertexManagement/Operation/VertexManagementOperationBase.cs
+@@ -47,30 +47,11 @@
+             this.persistenceStrategyFactory = persistenceStrategyFactory;
+             this.validationService = validationService;
+             this.featureSelectionState= featureSelectionState;
+-            var selectedVertexSettings = symbolSettings.Value.SelectedVertexSymbol;
+-            var midVertexSettings = symbolSettings.Value.MidVertexSymbol;
+-
+-            SelectedVertexSymbol = new SimpleMarkerSymbol(
+-                Enum.Parse<SimpleMarkerSymbolStyle>(selectedVertexSettings.Style, true),
+-                drawingSymbolColourParser.FromSetting(selectedVertexSettings.Colour),
+-                selectedVertexSettings.Size
+-            );
+-
+-            MidVertexSymbol = new SimpleMarkerSymbol(
+-                Enum.Parse<SimpleMarkerSymbolStyle>(midVertexSettings.Style, true),
+-                drawingSymbolColourParser.FromSetting(midVertexSettings.Colour),
+-                midVertexSettings.Size
+-            );
+-
+-            var VertexPoint = symbolSettings.Value.VertexPoint;
+-            PointGraphicSymbol = new SimpleMarkerSymbol(
+-                Enum.Parse<SimpleMarkerSymbolStyle>(VertexPoint.Style, true),
+-                drawingSymbolColourParser.FromSetting(VertexPoint.Colour), VertexPoint.Size);
+-
+-            var line = symbolSettings.Value.Line;
+-            LineGraphicSymbol = new SimpleLineSymbol(Enum.Parse<SimpleLineSymbolStyle>(line.Style, true),
+-                drawingSymbolColourParser.FromSetting(line.Colour), 
+-                line.Width);
++            var settings = symbolSettings.Value;
++            SelectedVertexSymbol = drawingSymbolColourParser.MarkerSymbol(settings.SelectedVertexSymbol, "SelectedVertexSymbol");
++            MidVertexSymbol = drawingSymbolColourParser.MarkerSymbol(settings.MidVertexSymbol, "MidVertexSymbol");
++            PointGraphicSymbol = drawingSymbolColourParser.MarkerSymbol(settings.VertexPoint, "VertexPoint");
++            LineGraphicSymbol = drawingSymbolColourParser.LineSymbol(settings.Line, "Line");
+         }
+ 
+         public virtual void Initialise(MapView mapView)
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementSymbols.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementSymbols.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementSymbols.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementSymbols.cs
+@@ -49,10 +49,7 @@
+     public static TEnum ParseStyle<TEnum>(string? value, TEnum fallback, string settingName, ILoggerService logger)
+         where TEnum : struct, Enum
+     {
+-        if (!string.IsNullOrWhiteSpace(value) &&
+-            !value.Trim().All(c => char.IsDigit(c) || c == '-') &&
+-            Enum.TryParse<TEnum>(value.Trim(), ignoreCase: true, out var parsed) &&
+-            Enum.IsDefined(parsed))
++        if (DrawingSymbolColourParserService.TryParseStyle<TEnum>(value, out var parsed))
+         {
+             return parsed;
+         }
+diff -ruN a/Src/MiEditor.MainApp/Controls/Zoom/ZoomToFeatureControl.xaml.cs b/Src/MiEditor.MainApp/Controls/Zoom/ZoomToFeatureControl.xaml.cs
+--- a/Src/MiEditor.MainApp/Controls/Zoom/ZoomToFeatureControl.xaml.cs
++++ b/Src/MiEditor.MainApp/Controls/Zoom/ZoomToFeatureControl.xaml.cs
+@@ -404,9 +404,12 @@
+             var flashOverlay = new GraphicsOverlay();
+             var flashGraph = new Graphic();
+ 
+-            var argbSetting = drawingSymbolsSettings.FlashFeature.Argb;
++            // A missing FlashFeature section falls back to the same green used for flash messages.
++            var argbSetting = drawingSymbolsSettings.FlashFeature?.Argb;
+ 
+-            flashFeatureColor ??= System.Drawing.Color.FromArgb(argbSetting.A, argbSetting.R, argbSetting.G, argbSetting.B);
++            flashFeatureColor ??= argbSetting is null
++                ? System.Drawing.Color.Lime
++                : System.Drawing.Color.FromArgb(argbSetting.A, argbSetting.R, argbSetting.G, argbSetting.B);
+ 
+             if (featType == FeatType.Polygon)
+             {
+diff -ruN a/Src/MiEditor.MainApp/ViewModels/Aoi/AoiControlViewModel.cs b/Src/MiEditor.MainApp/ViewModels/Aoi/AoiControlViewModel.cs
+--- a/Src/MiEditor.MainApp/ViewModels/Aoi/AoiControlViewModel.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Aoi/AoiControlViewModel.cs
+@@ -79,20 +79,8 @@
+         this.overlayService = overlayService;
+         this.appSettings = appSettings;
+ 
+-        var selectedVertexSettings = symbolSettings.Value.SelectedVertexSymbol;
+-        var midVertexSettings = symbolSettings.Value.MidVertexSymbol;
+-
+-        selectedVertexSymbol = new SimpleMarkerSymbol(
+-           Enum.Parse<SimpleMarkerSymbolStyle>(selectedVertexSettings.Style, true),
+-           drawingSymbolColourParser.FromSetting(selectedVertexSettings.Colour),
+-           selectedVertexSettings.Size
+-        );
+-
+-        midVertexSymbol = new SimpleMarkerSymbol(
+-            Enum.Parse<SimpleMarkerSymbolStyle>(midVertexSettings.Style, true),
+-            drawingSymbolColourParser.FromSetting(midVertexSettings.Colour),
+-            midVertexSettings.Size
+-        );
++        selectedVertexSymbol = drawingSymbolColourParser.MarkerSymbol(symbolSettings.Value.SelectedVertexSymbol, "SelectedVertexSymbol");
++        midVertexSymbol = drawingSymbolColourParser.MarkerSymbol(symbolSettings.Value.MidVertexSymbol, "MidVertexSymbol");
+     }
+ 
+     [ObservableProperty]
+diff -ruN a/Tests/MiEditor.Core.Tests/Services/Drawing/DrawingSymbolColourParserServiceTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/DrawingSymbolColourParserServiceTests.cs
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/DrawingSymbolColourParserServiceTests.cs
+@@ -0,0 +1,234 @@
++using Esri.ArcGISRuntime.Symbology;
++using Moq;
++using WG.MiEditor.Core.Services.Drawing;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Models.Drawing;
++using Colour = System.Drawing.Color;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing;
++
++// A bad hex in drawingsymbols.json used to throw from int.Parse / Substring inside whichever tool
++// built its symbols first. These pin the fall-back behaviour instead.
++public class DrawingSymbolColourParserServiceTests
++{
++    private readonly Mock<ILoggerService> logger = new();
++    private readonly DrawingSymbolColourParserService sut;
++
++    public DrawingSymbolColourParserServiceTests() => sut = new DrawingSymbolColourParserService(logger.Object);
++
++    private static ColourSetting Hex(string hex, ArgbSetting? argb = null) => new() { Hex = hex, Argb = argb! };
++
++    [Theory]
++    [InlineData("#FF0000", 255, 255, 0, 0)]
++    [InlineData("#00a9e6", 255, 0, 169, 230)]
++    [InlineData("#FF59B000", 255, 89, 176, 0)]
++    [InlineData("#4000FF00", 64, 0, 255, 0)]
++    [InlineData("00FFFF", 255, 0, 255, 255)]
++    [InlineData("  #FF0000  ", 255, 255, 0, 0)]
++    public void ValidHex_IsParsed(string hex, int a, int r, int g, int b)
++    {
++        Assert.Equal(Colour.FromArgb(a, r, g, b), sut.FromSetting(Hex(hex)));
++        logger.Verify(l => l.Warn(It.IsAny<string>()), Times.Never);
++    }
++
++    [Theory]
++    [InlineData("#")]
++    [InlineData("#F00")]          // shorthand is not supported by the schema
++    [InlineData("#FF00")]         // too short: used to throw ArgumentOutOfRangeException
++    [InlineData("#FF00000")]      // 7 digits: used to be read as ARGB with a missing digit
++    [InlineData("#GG0000")]       // not hex: used to throw FormatException
++    [InlineData("#FF0000FF00")]   // too long: used to silently drop the trailing digits
++    [InlineData("#-F0000")]
++    [InlineData("red")]
++    public void BadHex_FallsBackToBlack_AndWarns(string hex)
++    {
++        Assert.Equal(DrawingSymbolColourParserService.Fallback, sut.FromSetting(Hex(hex)));
++        logger.Verify(l => l.Warn(It.Is<string>(m => m.Contains(hex))), Times.Once);
++    }
++
++    [Fact]
++    public void BadHex_FallsBackToTheArgbValue_WhenOneIsConfigured()
++    {
++        var setting = Hex("#ZZZZZZ", new ArgbSetting { A = 255, R = 1, G = 2, B = 3 });
++
++        Assert.Equal(Colour.FromArgb(255, 1, 2, 3), sut.FromSetting(setting));
++        logger.Verify(l => l.Warn(It.IsAny<string>()), Times.Once);
++    }
++
++    [Fact]
++    public void BlankHex_UsesTheArgbValue_WithoutWarning()
++    {
++        var setting = Hex("", new ArgbSetting { A = 128, R = 10, G = 20, B = 30 });
++
++        Assert.Equal(Colour.FromArgb(128, 10, 20, 30), sut.FromSetting(setting));
++        logger.Verify(l => l.Warn(It.IsAny<string>()), Times.Never);
++    }
++
++    [Fact]
++    public void BlankHex_AndNoArgb_IsBlack()
++    {
++        Assert.Equal(Colour.Black, sut.FromSetting(Hex("")));
++    }
++
++    [Fact]
++    public void MissingSetting_IsBlack_AndWarns()
++    {
++        Assert.Equal(Colour.Black, sut.FromSetting(null));
++        logger.Verify(l => l.Warn(It.IsAny<string>()), Times.Once);
++    }
++
++    // DayOfWeek stands in for the Esri symbol style enums, which are parsed the same way.
++    [Theory]
++    [InlineData("Friday", DayOfWeek.Friday)]
++    [InlineData("friday", DayOfWeek.Friday)]
++    [InlineData("  FRIDAY ", DayOfWeek.Friday)]
++    public void Style_DefinedNames_AreParsed(string style, DayOfWeek expected)
++    {
++        Assert.Equal(expected, sut.StyleFromSetting(style, DayOfWeek.Monday));
++        logger.Verify(l => l.Warn(It.IsAny<string>()), Times.Never);
++    }
++
++    // Each of these used to throw from Enum.Parse (or, for numbers, produce an undefined style).
++    [Theory]
++    [InlineData(null)]
++    [InlineData("")]
++    [InlineData("   ")]
++    [InlineData("Fridya")]
++    [InlineData("5")]
++    [InlineData("99")]
++    [InlineData("-1")]
++    [InlineData("+2")]
++    [InlineData("Friday,Saturday")]
++    public void Style_BadNames_FallBack_AndWarn(string? style)
++    {
++        Assert.Equal(DayOfWeek.Monday, sut.StyleFromSetting(style, DayOfWeek.Monday));
++        logger.Verify(l => l.Warn(It.Is<string>(m => m.Contains(nameof(DayOfWeek)))), Times.Once);
++    }
++
++    [Fact]
++    public void Style_StillReturnsTheFallback_WhenLoggingThrows()
++    {
++        logger.Setup(l => l.Warn(It.IsAny<string>())).Throws<InvalidOperationException>();
++
++        Assert.Equal(DayOfWeek.Monday, sut.StyleFromSetting("nope", DayOfWeek.Monday));
++    }
++
++    // ---- Sizes ----
++
++    [Theory]
++    [InlineData(null)]
++    [InlineData(0d)]
++    [InlineData(-3d)]
++    [InlineData(double.NaN)]
++    [InlineData(double.PositiveInfinity)]
++    public void Size_Unusable_FallsBack_AndWarns(double? size)
++    {
++        Assert.Equal(7, sut.SizeFromSetting(size, 7));
++        logger.Verify(l => l.Warn(It.IsAny<string>()), Times.Once);
++    }
++
++    [Fact]
++    public void Size_Positive_IsKept()
++    {
++        Assert.Equal(2.5, sut.SizeFromSetting(2.5, 7));
++        logger.Verify(l => l.Warn(It.IsAny<string>()), Times.Never);
++    }
++
++    // ---- Symbols: a missing config section used to throw NullReferenceException ----
++
++    private static ColourSetting Red => new() { Hex = "#FF0000", Argb = null! };
++
++    [Fact]
++    public void MarkerSymbol_MissingSection_GivesADefault_AndOneWarningNamingIt()
++    {
++        var symbol = sut.MarkerSymbol(null, "SelectedVertexSymbol");
++
++        Assert.Equal(DrawingSymbolColourParserService.FallbackMarkerStyle, symbol.Style);
++        Assert.Equal(DrawingSymbolColourParserService.FallbackMarkerSize, symbol.Size);
++        logger.Verify(l => l.Warn(It.Is<string>(m => m.Contains("SelectedVertexSymbol"))), Times.Once);
++    }
++
++    [Fact]
++    public void MarkerSymbol_ValidSection_IsBuiltFromIt()
++    {
++        var symbol = sut.MarkerSymbol(new PointSymbolSetting { Style = "Square", Colour = Red, Size = 6 }, "Point");
++
++        Assert.Equal(SimpleMarkerSymbolStyle.Square, symbol.Style);
++        Assert.Equal(Colour.FromArgb(255, 255, 0, 0), symbol.Color);
++        Assert.Equal(6, symbol.Size);
++        logger.Verify(l => l.Warn(It.IsAny<string>()), Times.Never);
++    }
++
++    [Fact]
++    public void MarkerSymbol_MissingFields_EachFallBack_AndAreNamedInTheWarnings()
++    {
++        var symbol = sut.MarkerSymbol(new PointSymbolSetting { Style = null!, Colour = null!, Size = 0 }, "Point");
++
++        Assert.Equal(DrawingSymbolColourParserService.FallbackMarkerStyle, symbol.Style);
++        Assert.Equal(DrawingSymbolColourParserService.Fallback, symbol.Color);
++        Assert.Equal(DrawingSymbolColourParserService.FallbackMarkerSize, symbol.Size);
++        logger.Verify(l => l.Warn(It.Is<string>(m => m.Contains("Point.Style"))), Times.Once);
++        logger.Verify(l => l.Warn(It.Is<string>(m => m.Contains("Point.Colour"))), Times.Once);
++        logger.Verify(l => l.Warn(It.Is<string>(m => m.Contains("Point.Size"))), Times.Once);
++    }
++
++    [Fact]
++    public void LineSymbol_MissingSection_GivesADefault()
++    {
++        var symbol = sut.LineSymbol(null, "Line");
++
++        Assert.Equal(DrawingSymbolColourParserService.FallbackLineStyle, symbol.Style);
++        Assert.Equal(DrawingSymbolColourParserService.FallbackLineWidth, symbol.Width);
++    }
++
++    [Fact]
++    public void FillSymbol_MissingSection_GivesATranslucentDefault_WithAnOutline()
++    {
++        var symbol = sut.FillSymbol(null, "Polygon");
++
++        Assert.Equal(DrawingSymbolColourParserService.FallbackFill, symbol.Color);
++        Assert.True(symbol.Color.A < 255, "A default fill must not hide the map.");
++        Assert.IsType<SimpleLineSymbol>(symbol.Outline);
++    }
++
++    [Fact]
++    public void FillSymbol_MissingOutline_StillBuilds_AndNamesTheOutlineInTheWarning()
++    {
++        var setting = new PolygonSymbolSetting { FillStyle = "BackwardDiagonal", FillColour = Red, Outline = null! };
++
++        var symbol = sut.FillSymbol(setting, "Polygon");
++
++        Assert.Equal(SimpleFillSymbolStyle.BackwardDiagonal, symbol.Style);
++        Assert.Equal(Colour.FromArgb(255, 255, 0, 0), symbol.Color);
++        var outline = Assert.IsType<SimpleLineSymbol>(symbol.Outline);
++        Assert.Equal(DrawingSymbolColourParserService.FallbackLineWidth, outline.Width);
++        logger.Verify(l => l.Warn(It.Is<string>(m => m.Contains("Polygon.Outline"))), Times.Once);
++    }
++
++    [Fact]
++    public void FillSymbol_MissingFillColour_IsTranslucent_NotOpaqueBlack()
++    {
++        var setting = new PolygonSymbolSetting
++        {
++            FillStyle = "Solid",
++            FillColour = null!,
++            Outline = new LineSymbolSetting { Style = "Solid", Colour = Red, Width = 1 }
++        };
++
++        Assert.Equal(DrawingSymbolColourParserService.FallbackFill, sut.FillSymbol(setting, "Polygon").Color);
++    }
++
++    [Fact]
++    public void ColourWithFallback_UsesTheGivenFallback()
++    {
++        Assert.Equal(Colour.Lime, sut.FromSetting(null, Colour.Lime));
++    }
++
++    [Fact]
++    public void BadHex_StillReturnsAColour_WhenLoggingThrows()
++    {
++        logger.Setup(l => l.Warn(It.IsAny<string>())).Throws<InvalidOperationException>();
++
++        Assert.Equal(Colour.Black, sut.FromSetting(Hex("#nope")));
++    }
++}

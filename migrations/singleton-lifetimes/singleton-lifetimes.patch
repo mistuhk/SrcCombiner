@@ -1,0 +1,24 @@
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/DrawingSymbolColourParserService.cs b/Src/MiEditor.Core/Services/Drawing/DrawingSymbolColourParserService.cs
+--- a/Src/MiEditor.Core/Services/Drawing/DrawingSymbolColourParserService.cs
++++ b/Src/MiEditor.Core/Services/Drawing/DrawingSymbolColourParserService.cs
+@@ -11,7 +11,7 @@
+     Colour FromSetting(ColourSetting setting);
+ }
+ 
+-[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IDrawingSymbolColourParser) })]
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IDrawingSymbolColourParser) })]
+ public class DrawingSymbolColourParserService : IDrawingSymbolColourParser
+ {
+     public Colour FromSetting(ColourSetting setting)
+diff -ruN a/Src/MiEditor.Core/Services/MapData/MapViewService.cs b/Src/MiEditor.Core/Services/MapData/MapViewService.cs
+--- a/Src/MiEditor.Core/Services/MapData/MapViewService.cs
++++ b/Src/MiEditor.Core/Services/MapData/MapViewService.cs
+@@ -10,7 +10,7 @@
+     Task<MapView> GetMapViewAsync();
+ }
+ 
+-[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IMapViewService) })]
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IMapViewService) })]
+ public class MapViewService : IMapViewService
+ {
+     private readonly TaskCompletionSource<MapView> _mapViewTaskCompletionSource = new();

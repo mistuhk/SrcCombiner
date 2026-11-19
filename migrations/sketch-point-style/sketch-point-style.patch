@@ -1,0 +1,12 @@
+diff -ruN a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPointOperation.cs b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPointOperation.cs
+--- a/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPointOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Editing/AddFeatures/Operation/AddSketchPointOperation.cs
+@@ -52,7 +52,7 @@
+         this.addFeatureService = addFeatureService;
+         this.notificationManager = notificationManager;
+ 
+-        finalGraphicSymbol = drawingSymbolColourParser.MarkerSymbol(symbolSettings.Value.Point, "Point");
++        finalGraphicSymbol = drawingSymbolColourParser.MarkerSymbol(symbolSettings.Value.InFieldSketchPoint, "InFieldSketchPoint");
+         miSketchLayer = layerSettings.Name;
+ 
+         messenger.Register<AddSketchPointOperation, ClearEditingGraphicMessage>(this, (r, m) => r.Receive(m));
