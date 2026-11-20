@@ -1,0 +1,5 @@
+c912b5d98cf2df9efc9edae2e5992012dfc843792865d2c5d810c744c1ed474a  measure-tools/measure-tools.patch
+b80948cd7f4b8c9d887effc1a14a087f159790a5eb78bdeca5f68774d9983141  singleton-lifetimes/singleton-lifetimes.patch
+cbb78f0d3cce9508bd11bd43863836fc66e8e34385fa7ff44ad455ad98cc7051  sketch-point-style/sketch-point-style.patch
+642909b04f166d8f2cc7e55afc7afb8408c0391d3c744b5146e96bcbdfe272fb  symbol-config-safety/symbol-config-safety.patch
+0d03866c1a44ff6f4dac88aae4244f2ecd96af1b19c07b473ab755a7c2348945  tool-default-hash/tool-default-hash.patch

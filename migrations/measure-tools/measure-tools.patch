@@ -1,0 +1,3601 @@
+diff --git a/Src/MiEditor.Core/GlobalSuppressions.cs b/Src/MiEditor.Core/GlobalSuppressions.cs
+index 88900bbcbf38097889e058b55d337e758e2a2b2f..5f877ce1f900f6e5b44bf419c6d739eb77b71714 100644
+--- a/Src/MiEditor.Core/GlobalSuppressions.cs
++++ b/Src/MiEditor.Core/GlobalSuppressions.cs
+@@ -383,17 +383,6 @@ using System.Diagnostics.CodeAnalysis;
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Manager.MeasureOperationManager.EnsureInitialisedAsync~System.Threading.Tasks.Task")]
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.AreaMeasureOperation.#ctor(Microsoft.Extensions.Options.IOptions{WG.MiEditor.Models.Drawing.DrawingSymbolsSettings},WG.MiEditor.Core.Services.Drawing.IDrawingSymbolColourParser,CommunityToolkit.Mvvm.Messaging.IMessenger,WG.MiEditor.Core.Services.Notifications.INotificationManager)")]
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.DistanceMeasureOperation.#ctor(Microsoft.Extensions.Options.IOptions{WG.MiEditor.Models.Drawing.DrawingSymbolsSettings},WG.MiEditor.Core.Services.Drawing.IDrawingSymbolColourParser,CommunityToolkit.Mvvm.Messaging.IMessenger,WG.MiEditor.Core.Services.Notifications.INotificationManager)")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.Clear")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.CreateGraphic(Esri.ArcGISRuntime.Geometry.Geometry,Esri.ArcGISRuntime.Symbology.Symbol)")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.DisableDefaultInteractionOptions")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.EnableDefaultInteractionOptions")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.GeometryEditor_PropertyChanged(System.Object,System.ComponentModel.PropertyChangedEventArgs)")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.Initialise(Esri.ArcGISRuntime.Maui.MapView,Esri.ArcGISRuntime.UI.GraphicsOverlay)")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.IsGeometryValid(Esri.ArcGISRuntime.Geometry.Geometry)~System.Boolean")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.MapView_GeoViewDoubleTapped(System.Object,Esri.ArcGISRuntime.Maui.GeoViewInputEventArgs)")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.RestartGeometryEditor(Esri.ArcGISRuntime.Geometry.GeometryType)")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.Start")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.Stop")]
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.SheepMovementBufferOperation.MapView_GeoViewTapped(System.Object,Esri.ArcGISRuntime.Maui.GeoViewInputEventArgs)")]
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.SheepMovementBufferOperation.Start")]
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~M:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.SheepMovementBufferOperation.Stop")]
+@@ -463,7 +452,6 @@ using System.Diagnostics.CodeAnalysis;
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~P:WG.MiEditor.Core.Services.Drawing.Editing.Vertex_Management.Operation.VertexManagementOperationBase.GeometryEditor")]
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~P:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.AreaMeasureOperation.GeometryType")]
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~P:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.DistanceMeasureOperation.GeometryType")]
+-[assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~P:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.MeasureOperationBase.GeometryEditor")]
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~P:WG.MiEditor.Core.Services.Drawing.Measurement.Operation.SheepMovementBufferOperation.GeometryType")]
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~P:WG.MiEditor.Core.Services.MapData.MapViewsHistoryService.IsNextEnabled")]
+ [assembly: SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>", Scope = "member", Target = "~F:WG.MiEditor.Core.Services.Drawing.Editing.AddFeatures.Operation.AddLineOperation.geometryType")]
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Components/CleanupSteps.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/CleanupSteps.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..431e0a1cd143d3d2b8ea2be0b9182b0790a6e2f7
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/CleanupSteps.cs
+@@ -0,0 +1,36 @@
++using System.Runtime.ExceptionServices;
++
++namespace WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++
++/// <summary>
++/// Runs a sequence of teardown steps so that one failing step never prevents the rest from
++/// running. A single failure is rethrown with its original stack; several are aggregated.
++/// </summary>
++public static class CleanupSteps
++{
++    public static void RunAll(params Action[] steps)
++    {
++        List<Exception>? errors = null;
++
++        foreach (var step in steps)
++        {
++            try
++            {
++                step();
++            }
++            catch (Exception ex)
++            {
++                (errors ??= []).Add(ex);
++            }
++        }
++
++        if (errors is null) return;
++
++        if (errors.Count == 1)
++        {
++            ExceptionDispatchInfo.Capture(errors[0]).Throw();
++        }
++
++        throw new AggregateException("One or more measurement clean-up steps failed.", errors);
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MapInteractionLock.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MapInteractionLock.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..6d4d64c7ceb78f81d74507d701a30b7107578327
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MapInteractionLock.cs
+@@ -0,0 +1,40 @@
++using Esri.ArcGISRuntime.Maui;
++using Esri.ArcGISRuntime.UI;
++
++namespace WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++
++/// <summary>
++/// Turns map pan and zoom off for the lifetime of a measurement and puts back exactly what was
++/// there before. The original options are captured on <see cref="Lock(MapView)"/>, not once at
++/// start-up, so a release always restores the options in force when this lock was taken.
++/// Lock and release are both idempotent.
++/// </summary>
++public sealed class MapInteractionLock
++{
++    private Action? restore;
++
++    public bool IsLocked => restore is not null;
++
++    public void Lock(MapView mapView) =>
++        Lock(() => mapView.InteractionOptions, options => mapView.InteractionOptions = options);
++
++    /// <summary>Accessor-based overload; lets the lock be exercised without a live map view.</summary>
++    public void Lock(Func<MapViewInteractionOptions?> getOptions, Action<MapViewInteractionOptions?> setOptions)
++    {
++        if (IsLocked) return;
++
++        var original = getOptions();
++        setOptions(new MapViewInteractionOptions { IsPanEnabled = false, IsZoomEnabled = false });
++        restore = () => setOptions(original);
++    }
++
++    public void Release()
++    {
++        if (restore is null) return;
++
++        // Clear first so a failing restore cannot leave the lock stuck in the locked state.
++        var pending = restore;
++        restore = null;
++        pending();
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementErrorReporter.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementErrorReporter.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..78251e46e01f378b3177d423bd2ffd9a60d00243
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementErrorReporter.cs
+@@ -0,0 +1,47 @@
++using WG.MiEditor.Core.Services.Drawing.Measurement.Context;
++using WG.MiEditor.Core.Services.Notifications;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Models.Notifications;
++
++namespace WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++
++public interface IMeasurementErrorReporter
++{
++    /// <summary>Logs <paramref name="exception"/> and tells the user, without ever throwing.</summary>
++    void Report(string title, Exception exception);
++}
++
++/// <summary>
++/// Single place where measurement failures are logged and surfaced. Used from map event handlers,
++/// where an unhandled exception would otherwise take the app down.
++/// </summary>
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IMeasurementErrorReporter) })]
++public sealed class MeasurementErrorReporter(
++    ILoggerService logger,
++    INotificationManager notificationManager) : IMeasurementErrorReporter
++{
++    public const string GenericMessage = "Something went wrong with the measurement. Please try again.";
++
++    public void Report(string title, Exception exception)
++    {
++        try
++        {
++            logger.Error(exception, $"{title} failed.");
++        }
++        catch
++        {
++            // Logging must never turn a handled failure into an unhandled one.
++        }
++
++        try
++        {
++            var message = exception is MeasurementUnavailableException ? exception.Message : GenericMessage;
++            notificationManager.Show(title, message, NotificationType.Error);
++        }
++        catch
++        {
++            // As above: reporting is best effort.
++        }
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementGeometry.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementGeometry.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..8caf30a87e75a68f4483954cb4a0f8e694c85fa0
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementGeometry.cs
+@@ -0,0 +1,61 @@
++using Esri.ArcGISRuntime.Geometry;
++using WG.MiEditor.Shared.Messages.Measurement;
++
++namespace WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++
++/// <summary>Pure geometry rules shared by the measure tools.</summary>
++public static class MeasurementGeometry
++{
++    /// <summary>
++    /// True when the geometry has at least <paramref name="minVertexCount"/> vertices in its first
++    /// part. Null, empty and part-less geometries are never valid.
++    /// </summary>
++    public static bool HasMinimumVertices(Geometry? geometry, int minVertexCount)
++    {
++        if (geometry is null || geometry.IsEmpty) return false;
++
++        var parts = geometry switch
++        {
++            Polyline line => line.Parts,
++            Polygon polygon => polygon.Parts,
++            _ => null
++        };
++
++        if (parts is null) return true;
++
++        return parts.Count > 0 && parts[0].PointCount >= minVertexCount;
++    }
++
++    /// <summary>
++    /// Geodesic length (and area, for polygons) in metres and square metres. Lines and polygons
++    /// always produce a reading, zero while too few vertices exist, so the live panel never keeps
++    /// showing a stale value after the user undoes vertices. Null only for null geometry or types
++    /// that have no length.
++    /// </summary>
++    public static DrawingProgressMessage? Measure(Geometry? geometry)
++    {
++        switch (geometry)
++        {
++            case Polyline line:
++                return new DrawingProgressMessage(
++                    line.IsEmpty ? 0 : Finite(line.LengthGeodetic(LinearUnits.Meters, GeodeticCurveType.Geodesic)),
++                    null);
++
++            case Polygon polygon:
++                return polygon.IsEmpty
++                    ? new DrawingProgressMessage(0, 0)
++                    : new DrawingProgressMessage(
++                        Finite(polygon.LengthGeodetic(LinearUnits.Meters, GeodeticCurveType.Geodesic)),
++                        Finite(polygon.AreaGeodetic(AreaUnits.SquareMeters, GeodeticCurveType.Geodesic)));
++
++            default:
++                return null;
++        }
++    }
++
++    /// <summary>The zero reading for a sketch of <paramref name="geometryType"/> with no vertices.</summary>
++    public static DrawingProgressMessage Empty(GeometryType geometryType) =>
++        new(0, geometryType == GeometryType.Polygon ? 0 : null);
++
++    private static double Finite(double value) => double.IsFinite(value) && value > 0 ? value : 0;
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementResultLayer.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementResultLayer.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..c2b42c8e472278f38da558b3a2b491ff16084062
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementResultLayer.cs
+@@ -0,0 +1,36 @@
++using Esri.ArcGISRuntime.Geometry;
++using Esri.ArcGISRuntime.Symbology;
++using Esri.ArcGISRuntime.UI;
++
++namespace WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++
++/// <summary>
++/// Owns the single result graphic a measurement shows on an overlay. It only ever removes the
++/// graphic it added itself, so it never disturbs anything else on the overlay.
++/// </summary>
++public sealed class MeasurementResultLayer(GraphicsOverlay overlay)
++{
++    private Graphic? current;
++
++    public bool HasResult => current is not null;
++
++    /// <summary>Replaces the current result. Null or empty geometries just clear it.</summary>
++    public void Show(Geometry? geometry, Symbol symbol)
++    {
++        Clear();
++
++        if (geometry is null || geometry.IsEmpty) return;
++
++        current = new Graphic(geometry, symbol);
++        overlay.Graphics.Add(current);
++    }
++
++    public void Clear()
++    {
++        if (current is null) return;
++
++        var graphic = current;
++        current = null;
++        overlay.Graphics.Remove(graphic);
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementSymbols.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementSymbols.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..ddfb308aba81ad68c84273fc61456c2f3dbfb2db
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/MeasurementSymbols.cs
+@@ -0,0 +1,110 @@
++using Esri.ArcGISRuntime.Symbology;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Models.Drawing;
++using Colour = System.Drawing.Color;
++
++namespace WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++
++/// <summary>
++/// Builds the measurement result symbols from appsettings without ever throwing. A typo or a
++/// missing value in configuration logs a warning and falls back to a sensible default, instead
++/// of failing service construction and taking the whole measurement toolbar down with it.
++/// </summary>
++public static class MeasurementSymbols
++{
++    public static readonly Colour DefaultLineColour = Colour.FromArgb(255, 0, 112, 255);
++    public static readonly Colour DefaultFillColour = Colour.FromArgb(64, 0, 112, 255);
++    public const double DefaultLineWidth = 2;
++
++    public static SimpleLineSymbol Line(
++        LineSymbolSetting? setting,
++        IDrawingSymbolColourParser colourParser,
++        ILoggerService logger,
++        string settingName)
++    {
++        var style = ParseStyle(setting?.Style, SimpleLineSymbolStyle.Solid, $"{settingName}.Style", logger);
++        var colour = ParseColour(setting?.Colour, DefaultLineColour, $"{settingName}.Colour", colourParser, logger);
++        var width = ValidWidth(setting?.Width, $"{settingName}.Width", logger);
++
++        return new SimpleLineSymbol(style, colour, width);
++    }
++
++    public static SimpleFillSymbol Polygon(
++        PolygonSymbolSetting? setting,
++        IDrawingSymbolColourParser colourParser,
++        ILoggerService logger,
++        string settingName)
++    {
++        var outline = Line(setting?.Outline, colourParser, logger, $"{settingName}.Outline");
++        var fillStyle = ParseStyle(setting?.FillStyle, SimpleFillSymbolStyle.Solid, $"{settingName}.FillStyle", logger);
++        var fillColour = ParseColour(setting?.FillColour, DefaultFillColour, $"{settingName}.FillColour", colourParser, logger);
++
++        return new SimpleFillSymbol(fillStyle, fillColour, outline);
++    }
++
++    /// <summary>
++    /// Case-insensitive enum parse that only accepts defined names, so "5" or "Soild" fall back
++    /// to <paramref name="fallback"/> with a warning rather than producing an undefined value.
++    /// </summary>
++    public static TEnum ParseStyle<TEnum>(string? value, TEnum fallback, string settingName, ILoggerService logger)
++        where TEnum : struct, Enum
++    {
++        if (!string.IsNullOrWhiteSpace(value) &&
++            !value.Trim().All(c => char.IsDigit(c) || c == '-') &&
++            Enum.TryParse<TEnum>(value.Trim(), ignoreCase: true, out var parsed) &&
++            Enum.IsDefined(parsed))
++        {
++            return parsed;
++        }
++
++        Warn(logger, $"Measurement symbol setting '{settingName}' has an unrecognised value '{value}'. Using '{fallback}'.");
++        return fallback;
++    }
++
++    public static Colour ParseColour(
++        ColourSetting? setting,
++        Colour fallback,
++        string settingName,
++        IDrawingSymbolColourParser colourParser,
++        ILoggerService logger)
++    {
++        if (setting is not null)
++        {
++            try
++            {
++                return colourParser.FromSetting(setting);
++            }
++            catch (Exception ex)
++            {
++                Warn(logger, $"Measurement symbol setting '{settingName}' is not a valid colour ({ex.Message}). Using the default.");
++                return fallback;
++            }
++        }
++
++        Warn(logger, $"Measurement symbol setting '{settingName}' is missing. Using the default.");
++        return fallback;
++    }
++
++    private static double ValidWidth(double? width, string settingName, ILoggerService logger)
++    {
++        if (width is { } value && double.IsFinite(value) && value > 0)
++        {
++            return value;
++        }
++
++        Warn(logger, $"Measurement symbol setting '{settingName}' has an invalid width '{width}'. Using {DefaultLineWidth}.");
++        return DefaultLineWidth;
++    }
++
++    private static void Warn(ILoggerService logger, string message)
++    {
++        try
++        {
++            logger.Warn(message);
++        }
++        catch
++        {
++            // A logging failure must not stop the symbol from being built.
++        }
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Components/SketchMeasurement.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/SketchMeasurement.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..6eb3b2b22304a5a6f94e93c75dcf287f3a03f4dd
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Components/SketchMeasurement.cs
+@@ -0,0 +1,236 @@
++using CommunityToolkit.Mvvm.Messaging;
++using Esri.ArcGISRuntime.Geometry;
++using Esri.ArcGISRuntime.Maui;
++using Esri.ArcGISRuntime.Symbology;
++using Esri.ArcGISRuntime.UI.Editing;
++using System.ComponentModel;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Context;
++
++namespace WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++
++/// <summary>Configuration for one kind of sketched measurement.</summary>
++/// <param name="Title">User-facing name, used for error notifications.</param>
++/// <param name="GeometryType">Geometry the editor sketches.</param>
++/// <param name="MinVertexCount">Vertices required before a sketch can be completed.</param>
++/// <param name="ResultSymbol">Symbol for the completed measurement.</param>
++/// <param name="OnInvalidGeometry">Called when the user completes a sketch with too few vertices.</param>
++public sealed record SketchMeasurementOptions(
++    string Title,
++    GeometryType GeometryType,
++    int MinVertexCount,
++    Symbol ResultSymbol,
++    Action OnInvalidGeometry);
++
++/// <summary>
++/// A geometry-editor driven measurement: the user taps vertices, live length/area is broadcast as
++/// <see cref="Shared.Messages.Measurement.DrawingProgressMessage"/>, and a double-tap completes the
++/// sketch, leaving the result on the map until the next sketch begins.
++/// <para>
++/// Pan and zoom are locked only while a sketch has at least one vertex, so dragging a vertex
++/// cannot move the map and the completing double-tap cannot zoom it. Before the first vertex and
++/// between measurements the map is free to pan and zoom.
++/// </para>
++/// <para>
++/// Composed from <see cref="MapInteractionLock"/> (pan/zoom) and <see cref="MeasurementResultLayer"/>
++/// (result graphic). Every session is fully torn down by <see cref="Stop"/>, even when individual
++/// steps fail, and a failed <see cref="Start"/> leaves nothing attached.
++/// </para>
++/// </summary>
++public sealed class SketchMeasurement(
++    IMessenger messenger,
++    IMeasurementErrorReporter errorReporter,
++    SketchMeasurementOptions options)
++{
++    private readonly MapInteractionLock interactionLock = new();
++
++    private MapView? mapView;
++    private GeometryEditor? editor;
++    private MeasurementResultLayer? results;
++
++    // The map has one geometry editor shared by every drawing tool, and each tool assigns its own
++    // VertexTool instance when it starts. Comparing against ours tells us whether the running
++    // session is this measurement's, so we never react to, or stop, another tool's drawing.
++    private VertexTool? ownTool;
++
++    // Set when a sketch completes. The result stays visible until the user places the first
++    // vertex of the next sketch, at which point only the result graphic is removed.
++    private bool clearResultOnNextVertex;
++
++    // True while a double-tap is stopping and restarting the editor. The editor raises geometry
++    // changes during that, which must not be mistaken for the user undoing their vertices.
++    private bool completingSketch;
++
++    public bool IsRunning => mapView is not null;
++
++    public void Start(MeasurementContext context)
++    {
++        ArgumentNullException.ThrowIfNull(context);
++
++        if (IsRunning) Stop();
++
++        var geometryEditor = context.MapView.GeometryEditor
++            ?? throw new MeasurementUnavailableException("The map cannot be measured on right now. Please try again in a moment.");
++
++        mapView = context.MapView;
++        editor = geometryEditor;
++        results = new MeasurementResultLayer(context.Overlay);
++
++        try
++        {
++            ownTool = CreateVertexTool();
++
++            // Anything still drawing should have been stopped by its own toolbar through the
++            // activation coordinator; this only clears a stale session so Start cannot throw.
++            if (geometryEditor.IsStarted) geometryEditor.Stop();
++
++            geometryEditor.Tool = ownTool;
++            geometryEditor.PropertyChanged += OnEditorPropertyChanged;
++            context.MapView.GeoViewDoubleTapped += OnDoubleTapped;
++
++            geometryEditor.Start(options.GeometryType);
++        }
++        catch
++        {
++            try { Stop(); } catch { /* the original failure is the one worth reporting */ }
++            throw;
++        }
++    }
++
++    public void Stop()
++    {
++        if (!IsRunning) return;
++
++        var view = mapView!;
++        var geometryEditor = editor!;
++        var resultLayer = results;
++        var owned = OwnsSession(geometryEditor);
++
++        mapView = null;
++        editor = null;
++        results = null;
++        ownTool = null;
++        clearResultOnNextVertex = false;
++
++        CleanupSteps.RunAll(
++            () => view.GeoViewDoubleTapped -= OnDoubleTapped,
++            () => geometryEditor.PropertyChanged -= OnEditorPropertyChanged,
++            () => { if (owned) geometryEditor.Stop(); },
++            () => resultLayer?.Clear(),
++            interactionLock.Release);
++    }
++
++    private void OnDoubleTapped(object? sender, GeoViewInputEventArgs e)
++    {
++        var geometryEditor = editor;
++        var current = geometryEditor?.Geometry;
++        if (geometryEditor is null || !OwnsSession(geometryEditor) || current is null || current.IsEmpty || current.GeometryType != options.GeometryType)
++        {
++            // No sketch of ours in progress: leave the double-tap to the map (so it can zoom) or
++            // to whichever tool is drawing.
++            return;
++        }
++
++        e.Handled = true;
++
++        completingSketch = true;
++        try
++        {
++            var sketch = geometryEditor.Stop();
++
++            // The sketch is finished: free the map so the user can pan or zoom before the next one.
++            interactionLock.Release();
++
++            if (!MeasurementGeometry.HasMinimumVertices(sketch, options.MinVertexCount))
++            {
++                options.OnInvalidGeometry();
++                messenger.Send(MeasurementGeometry.Empty(options.GeometryType));
++            }
++            else
++            {
++                results?.Show(sketch, options.ResultSymbol);
++                clearResultOnNextVertex = true;
++            }
++
++            geometryEditor.Start(options.GeometryType);
++        }
++        catch (Exception ex)
++        {
++            errorReporter.Report(options.Title, ex);
++        }
++        finally
++        {
++            completingSketch = false;
++        }
++    }
++
++    private void OnEditorPropertyChanged(object? sender, PropertyChangedEventArgs e)
++    {
++        if (e.PropertyName != nameof(GeometryEditor.Geometry)) return;
++
++        try
++        {
++            var view = mapView;
++            var geometryEditor = editor;
++            if (view is null || geometryEditor is null) return;
++
++            if (!OwnsSession(geometryEditor))
++            {
++                // Another tool has taken the editor: do not measure its drawing or hold the map.
++                interactionLock.Release();
++                return;
++            }
++
++            var geometry = geometryEditor.Geometry;
++
++            if (geometry is null || geometry.IsEmpty)
++            {
++                // No vertices (new sketch, or the user undid them all): leave the map free.
++                interactionLock.Release();
++
++                // If the user undid their vertices, reset the live readings to zero. Straight after
++                // a completed sketch the panel keeps showing that result until the next one starts.
++                if (!clearResultOnNextVertex && !completingSketch)
++                {
++                    messenger.Send(MeasurementGeometry.Empty(options.GeometryType));
++                }
++
++                return;
++            }
++
++            // First vertex of a sketch: lock until it is completed. Idempotent for later vertices.
++            interactionLock.Lock(view);
++
++            if (clearResultOnNextVertex)
++            {
++                // Remove the previous result only. The editor's geometry is left alone: it now
++                // holds the vertex the user just placed.
++                clearResultOnNextVertex = false;
++                results?.Clear();
++            }
++
++            if (MeasurementGeometry.Measure(geometry) is { } progress)
++            {
++                messenger.Send(progress);
++            }
++        }
++        catch (Exception ex)
++        {
++            errorReporter.Report(options.Title, ex);
++        }
++    }
++
++    private bool OwnsSession(GeometryEditor geometryEditor) =>
++        ownTool is not null && geometryEditor.IsStarted && ReferenceEquals(geometryEditor.Tool, ownTool);
++
++    private static VertexTool CreateVertexTool() => new()
++    {
++        Style = new GeometryEditorStyle
++        {
++            VertexSymbol = new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Circle, System.Drawing.Color.Red, 6),
++            SelectedVertexSymbol = new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Circle, System.Drawing.Color.Red, 6),
++            SelectedMidVertexSymbol = new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Circle, System.Drawing.Color.Red, 6),
++            MidVertexSymbol = new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Square, System.Drawing.Color.Red, 6),
++            VertexTextSymbol = null
++        }
++    };
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Context/IMeasurementContextProvider.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Context/IMeasurementContextProvider.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..9451a7f341d71455cd5dab25fc197a8a4e34a5d9
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Context/IMeasurementContextProvider.cs
+@@ -0,0 +1,11 @@
++namespace WG.MiEditor.Core.Services.Drawing.Measurement.Context;
++
++/// <summary>
++/// Supplies a ready-to-use <see cref="MeasurementContext"/>. Implementations guarantee that the
++/// returned overlay is attached to the returned map, or throw
++/// <see cref="MeasurementUnavailableException"/>.
++/// </summary>
++public interface IMeasurementContextProvider
++{
++    Task<MeasurementContext> GetAsync(CancellationToken cancellationToken = default);
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Context/MapViewMeasurementContextProvider.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Context/MapViewMeasurementContextProvider.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..4d487ccdd114379d589ca2ca8a2405e988c0d68c
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Context/MapViewMeasurementContextProvider.cs
+@@ -0,0 +1,75 @@
++using Esri.ArcGISRuntime.Maui;
++using Esri.ArcGISRuntime.UI;
++using WG.MiEditor.Core.Services.MapData;
++using WG.MiEditor.Shared.AutoScanning;
++
++namespace WG.MiEditor.Core.Services.Drawing.Measurement.Context;
++
++/// <summary>
++/// Builds the measurement context from the registered map. The overlay is created once but its
++/// attachment is checked on every call: other parts of the app clear
++/// <see cref="GeoView.GraphicsOverlays"/> (for example zoom to feature), and without this check
++/// measurements would carry on drawing onto an overlay that is no longer on the map.
++/// </summary>
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IMeasurementContextProvider) })]
++public sealed class MapViewMeasurementContextProvider : IMeasurementContextProvider
++{
++    public const string OverlayId = "measurementOverlay";
++
++    public static readonly TimeSpan DefaultMapReadyTimeout = TimeSpan.FromSeconds(10);
++
++    private readonly IMapViewService mapViewService;
++    private readonly TimeSpan mapReadyTimeout;
++    private GraphicsOverlay? overlay;
++
++    /// <param name="mapViewService">Source of the map view.</param>
++    /// <param name="mapReadyTimeout">How long to wait for the map to be registered. Not registered in DI, so the default applies in the app.</param>
++    public MapViewMeasurementContextProvider(IMapViewService mapViewService, TimeSpan? mapReadyTimeout = null)
++    {
++        this.mapViewService = mapViewService;
++        this.mapReadyTimeout = mapReadyTimeout ?? DefaultMapReadyTimeout;
++    }
++
++    public async Task<MeasurementContext> GetAsync(CancellationToken cancellationToken = default)
++    {
++        MapView? mapView;
++
++        try
++        {
++            // The map view service never completes if the map is never registered, so bound the
++            // wait rather than leaving the tool looking active while nothing happens.
++            mapView = await mapViewService.GetMapViewAsync().WaitAsync(mapReadyTimeout, cancellationToken);
++        }
++        catch (TimeoutException ex)
++        {
++            throw new MeasurementUnavailableException("The map is not ready yet. Please try again in a moment.", ex);
++        }
++
++        if (mapView is null)
++        {
++            throw new MeasurementUnavailableException("The map is not ready yet. Please try again in a moment.");
++        }
++
++        if (mapView.GeometryEditor is null)
++        {
++            throw new MeasurementUnavailableException("The map cannot be measured on right now. Please try again in a moment.");
++        }
++
++        var overlays = mapView.GraphicsOverlays
++            ?? throw new MeasurementUnavailableException("The map cannot display measurements right now. Please try again in a moment.");
++
++        overlay ??= new GraphicsOverlay { Id = OverlayId, RenderingMode = GraphicsRenderingMode.Dynamic };
++        EnsureAttached(overlays, overlay);
++
++        return new MeasurementContext(mapView, overlay);
++    }
++
++    /// <summary>Adds <paramref name="overlay"/> to <paramref name="overlays"/> unless it is already there.</summary>
++    public static void EnsureAttached(GraphicsOverlayCollection overlays, GraphicsOverlay overlay)
++    {
++        if (!overlays.Contains(overlay))
++        {
++            overlays.Add(overlay);
++        }
++    }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Context/MeasurementContext.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Context/MeasurementContext.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..2fba1570cec3442d0dea1c8ee2f05400bf82eb84
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Context/MeasurementContext.cs
+@@ -0,0 +1,11 @@
++using Esri.ArcGISRuntime.Maui;
++using Esri.ArcGISRuntime.UI;
++
++namespace WG.MiEditor.Core.Services.Drawing.Measurement.Context;
++
++/// <summary>
++/// What a measure operation needs for one session: the map to listen to and the overlay to
++/// draw results on. A fresh context is handed to every <c>Start</c>, so an operation never
++/// holds on to a map or overlay between sessions.
++/// </summary>
++public sealed record MeasurementContext(MapView MapView, GraphicsOverlay Overlay);
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Context/MeasurementUnavailableException.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Context/MeasurementUnavailableException.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..8cf8cebf6f50d02d40f50d2cfab54a5c44f76fc1
+--- /dev/null
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Context/MeasurementUnavailableException.cs
+@@ -0,0 +1,12 @@
++namespace WG.MiEditor.Core.Services.Drawing.Measurement.Context;
++
++/// <summary>
++/// Raised when a measurement cannot start because the map is not in a usable state. The
++/// message is written for the user and is safe to show in a notification.
++/// </summary>
++public sealed class MeasurementUnavailableException : Exception
++{
++    public MeasurementUnavailableException(string message) : base(message) { }
++
++    public MeasurementUnavailableException(string message, Exception innerException) : base(message, innerException) { }
++}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Manager/MeasureOperationManager.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Manager/MeasureOperationManager.cs
+index 25cbc3eb79aefc391b0868228232e1778e56cf22..6bd71adf38f50721370d2e6216576165dfce02d5 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Measurement/Manager/MeasureOperationManager.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Manager/MeasureOperationManager.cs
+@@ -1,74 +1,77 @@
+-
+-using Esri.ArcGISRuntime.Maui;
+-using Esri.ArcGISRuntime.UI;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Context;
+ using WG.MiEditor.Core.Services.Drawing.Measurement.Operation;
+-using WG.MiEditor.Core.Services.MapData;
+ using WG.MiEditor.Shared.AutoScanning;
+ using WG.MiEditor.Shared.Models.Toolbar;
+ 
+ namespace WG.MiEditor.Core.Services.Drawing.Measurement.Manager;
+ 
+-[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IMeasureOperationManager) })]
++/// <summary>
++/// Routes the active measure tool to its operation. Activation and deactivation are serialised so
++/// rapid taps cannot interleave, a fresh context (with the overlay re-attached if something
++/// removed it) is fetched on every activation, and the current operation is forgotten before it
++/// is stopped so a failing stop can never wedge the manager.
++/// <para>
++/// Failures propagate to the caller, which owns rolling back the toolbar state and telling the
++/// user. Continuations deliberately stay on the caller's (UI) context because operations touch
++/// the map view.
++/// </para>
++/// </summary>
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IMeasureOperationManager) })]
+ public sealed class MeasureOperationManager : IMeasureOperationManager
+ {
+-    private readonly IMapViewService mapViewService;
+-    private readonly Dictionary<MeasureTool, IMeasureOperation> measureOperations;
+-    private IMeasureOperation? currentMeasureOperation;
+-    private bool isInitialised = false;
++    private readonly IMeasurementContextProvider contextProvider;
++    private readonly IReadOnlyDictionary<MeasureTool, IMeasureOperation> operations;
++    private readonly SemaphoreSlim gate = new(1, 1);
+ 
+-    public MeasureOperationManager(IMapViewService mapViewService, IEnumerable<IMeasureOperation> measureOperations)
+-    {
+-        this.mapViewService = mapViewService;
++    private IMeasureOperation? current;
+ 
+-        this.measureOperations = new Dictionary<MeasureTool, IMeasureOperation>
+-        {
+-            { MeasureTool.Distance, measureOperations.OfType<DistanceMeasureOperation>().First() },
+-            { MeasureTool.Area, measureOperations.OfType<AreaMeasureOperation>().First() },
+-            { MeasureTool.SheepMovementBuffer, measureOperations.OfType<SheepMovementBufferOperation>().First() },
+-        };
++    public MeasureOperationManager(IMeasurementContextProvider contextProvider, IEnumerable<IMeasureOperation> measureOperations)
++    {
++        this.contextProvider = contextProvider;
++        operations = measureOperations.ToDictionary(operation => operation.Tool);
+     }
+ 
+     public async Task Activate(MeasureTool tool)
+     {
+-        await EnsureInitialisedAsync();
++        if (!operations.TryGetValue(tool, out var next))
++        {
++            throw new ArgumentOutOfRangeException(nameof(tool), tool, "No measure operation is registered for this tool.");
++        }
+ 
+-        if (measureOperations.TryGetValue(tool, out var newMeasureOperation))
++        await gate.WaitAsync();
++        try
+         {
+-            if (currentMeasureOperation == newMeasureOperation) return;
+-            if (currentMeasureOperation != null) await Deactivate();
++            if (ReferenceEquals(current, next)) return;
+ 
+-            currentMeasureOperation = newMeasureOperation;
+-            currentMeasureOperation.Start();
++            StopCurrent();
++
++            var context = await contextProvider.GetAsync();
++            next.Start(context);
++            current = next;
++        }
++        finally
++        {
++            gate.Release();
+         }
+     }
+ 
+     public async Task Deactivate()
+     {
+-        if (currentMeasureOperation == null) return;
+-
+-        await EnsureInitialisedAsync();
+-        currentMeasureOperation.Stop();
+-        currentMeasureOperation = null;
+-    }
+-
+-    private async Task EnsureInitialisedAsync()
+-    {
+-        if (isInitialised) return;
+-
+-        var mapView = await mapViewService.GetMapViewAsync();
+-
+-        if (mapView == null)
+-            return;
+-
+-        var graphicsOverlay = new GraphicsOverlay { RenderingMode = GraphicsRenderingMode.Dynamic };
+-
+-        mapView.GraphicsOverlays?.Add(graphicsOverlay);
+-
+-        foreach (var measureOperation in measureOperations.Values)
++        await gate.WaitAsync();
++        try
++        {
++            StopCurrent();
++        }
++        finally
+         {
+-            measureOperation.Initialise(mapView, graphicsOverlay);
++            gate.Release();
+         }
++    }
+ 
+-        isInitialised = true;
++    private void StopCurrent()
++    {
++        var operation = current;
++        current = null;
++        operation?.Stop();
+     }
+ }
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/AreaMeasureOperation.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/AreaMeasureOperation.cs
+index 8831d4d4b2076df89df7894850b366b5dfbec947..fddf14cced5f95addb75a47175fa1ba006efb6ad 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/AreaMeasureOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/AreaMeasureOperation.cs
+@@ -1,51 +1,70 @@
+-
+ using CommunityToolkit.Mvvm.Messaging;
+ using Esri.ArcGISRuntime.Geometry;
+-using Esri.ArcGISRuntime.Symbology;
+ using Microsoft.Extensions.Options;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Context;
+ using WG.MiEditor.Core.Services.Notifications;
++using WG.MiEditor.Logging.Abstractions;
+ using WG.MiEditor.Models.Drawing;
+ using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Messages.Measurement;
+ using WG.MiEditor.Shared.Models.Notifications;
+ using WG.MiEditor.Shared.Models.Toolbar;
+ 
+ namespace WG.MiEditor.Core.Services.Drawing.Measurement.Operation;
+ 
+-[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IMeasureOperation) })]
+-public class AreaMeasureOperation : MeasureOperationBase
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IMeasureOperation) })]
++public sealed class AreaMeasureOperation : IMeasureOperation
+ {
+-    protected override GeometryType GeometryType => GeometryType.Polygon;
+-    protected override Symbol FinalGraphicSymbol { get; }
+-    protected override MeasureTool Tool => MeasureTool.Area;
+-    protected override short MinVertexCount => 3;
++    private const string Title = "Area Measurement";
++    private const int MinVertexCount = 3;
+ 
+-    private readonly INotificationManager notificationManager;
++    private readonly IMessenger messenger;
++    private readonly SketchMeasurement sketch;
+ 
+     public AreaMeasureOperation(
+         IOptions<DrawingSymbolsSettings> symbolSettings,
+         IDrawingSymbolColourParser drawingSymbolColourParser,
+         IMessenger messenger,
+-        INotificationManager notificationManager) 
+-        : base(messenger)
++        INotificationManager notificationManager,
++        IMeasurementErrorReporter errorReporter,
++        ILoggerService logger)
+     {
+-        var settings = symbolSettings.Value.Polygon;
++        this.messenger = messenger;
++
++        var resultSymbol = MeasurementSymbols.Polygon(
++            symbolSettings.Value?.Polygon, drawingSymbolColourParser, logger, $"{nameof(DrawingSymbolsSettings)}.{nameof(DrawingSymbolsSettings.Polygon)}");
+ 
+-        var outlineStyle = Enum.Parse<SimpleLineSymbolStyle>(settings.Outline.Style, true);
+-        var outlineColour = drawingSymbolColourParser.FromSetting(settings.Outline.Colour);
+-        var outlineSymbol = new SimpleLineSymbol(outlineStyle, outlineColour, settings.Outline.Width);
++        sketch = new SketchMeasurement(messenger, errorReporter, new SketchMeasurementOptions(
++            Title,
++            GeometryType.Polygon,
++            MinVertexCount,
++            resultSymbol,
++            OnInvalidGeometry: () => notificationManager.Show(
++                Title,
++                $"An area requires minimum of {MinVertexCount} points.",
++                NotificationType.Error)));
++    }
+ 
+-        var fillStyle = Enum.Parse<SimpleFillSymbolStyle>(settings.FillStyle, true);
+-        var fillColour = drawingSymbolColourParser.FromSetting(settings.FillColour);
++    public MeasureTool Tool => MeasureTool.Area;
+ 
+-        FinalGraphicSymbol = new SimpleFillSymbol(fillStyle, fillColour, outlineSymbol);
+-        this.notificationManager = notificationManager;
++    public void Start(MeasurementContext context)
++    {
++        sketch.Start(context);
++        messenger.Send(new SketchingStartedMessage<MeasureTool>(Tool));
+     }
+ 
+-    protected override void OnGeometryInvalid()
++    public void Stop()
+     {
+-        notificationManager.Show(
+-            "Area Measurement", 
+-            $"An area requires minimum of {MinVertexCount} points.", 
+-            NotificationType.Error);
++        if (!sketch.IsRunning) return;
++
++        try
++        {
++            sketch.Stop();
++        }
++        finally
++        {
++            messenger.Send(new SketchingCompletedMessage<MeasureTool>(Tool));
++        }
+     }
+ }
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/DistanceMeasureOperation.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/DistanceMeasureOperation.cs
+index ee8f769cfc7e5fb54e29b21a2fce79594fe5fd38..72716c012df699aa85e476e4d3bf167dbeff61dc 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/DistanceMeasureOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/DistanceMeasureOperation.cs
+@@ -1,46 +1,70 @@
+-
+ using CommunityToolkit.Mvvm.Messaging;
+ using Esri.ArcGISRuntime.Geometry;
+-using Esri.ArcGISRuntime.Symbology;
+ using Microsoft.Extensions.Options;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Context;
+ using WG.MiEditor.Core.Services.Notifications;
++using WG.MiEditor.Logging.Abstractions;
+ using WG.MiEditor.Models.Drawing;
+ using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Messages.Measurement;
+ using WG.MiEditor.Shared.Models.Notifications;
+ using WG.MiEditor.Shared.Models.Toolbar;
+ 
+ namespace WG.MiEditor.Core.Services.Drawing.Measurement.Operation;
+ 
+-[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IMeasureOperation) })]
+-public class DistanceMeasureOperation : MeasureOperationBase
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IMeasureOperation) })]
++public sealed class DistanceMeasureOperation : IMeasureOperation
+ {
+-    protected override GeometryType GeometryType => GeometryType.Polyline;
+-    protected override Symbol FinalGraphicSymbol { get; }
+-    protected override MeasureTool Tool => MeasureTool.Distance;
+-    protected override short MinVertexCount => 2;
++    private const string Title = "Distance Measurement";
++    private const int MinVertexCount = 2;
+ 
+-    private readonly INotificationManager notificationManager;
++    private readonly IMessenger messenger;
++    private readonly SketchMeasurement sketch;
+ 
+     public DistanceMeasureOperation(
+         IOptions<DrawingSymbolsSettings> symbolSettings,
+-        IDrawingSymbolColourParser parser, 
++        IDrawingSymbolColourParser parser,
+         IMessenger messenger,
+-        INotificationManager notificationManager) 
+-        : base(messenger)
++        INotificationManager notificationManager,
++        IMeasurementErrorReporter errorReporter,
++        ILoggerService logger)
+     {
+-        var settings = symbolSettings.Value.Line;
+-        var style = Enum.Parse<SimpleLineSymbolStyle>(settings.Style, true);
+-        var colour = parser.FromSetting(settings.Colour);
++        this.messenger = messenger;
++
++        var resultSymbol = MeasurementSymbols.Line(
++            symbolSettings.Value?.Line, parser, logger, $"{nameof(DrawingSymbolsSettings)}.{nameof(DrawingSymbolsSettings.Line)}");
+ 
+-        FinalGraphicSymbol = new SimpleLineSymbol(style, colour, settings.Width);
+-        this.notificationManager = notificationManager;
++        sketch = new SketchMeasurement(messenger, errorReporter, new SketchMeasurementOptions(
++            Title,
++            GeometryType.Polyline,
++            MinVertexCount,
++            resultSymbol,
++            OnInvalidGeometry: () => notificationManager.Show(
++                Title,
++                $"Distance measurement requires minimum of {MinVertexCount} points.",
++                NotificationType.Error)));
+     }
+ 
+-    protected override void OnGeometryInvalid()
++    public MeasureTool Tool => MeasureTool.Distance;
++
++    public void Start(MeasurementContext context)
+     {
+-        notificationManager.Show(
+-            "Distance Measurement",
+-            $"Distance measurement requires minimum of {MinVertexCount} points.",
+-            NotificationType.Error);
++        sketch.Start(context);
++        messenger.Send(new SketchingStartedMessage<MeasureTool>(Tool));
++    }
++
++    public void Stop()
++    {
++        if (!sketch.IsRunning) return;
++
++        try
++        {
++            sketch.Stop();
++        }
++        finally
++        {
++            messenger.Send(new SketchingCompletedMessage<MeasureTool>(Tool));
++        }
+     }
+ }
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/IMeasureOperation.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/IMeasureOperation.cs
+index efdccf8d9bcaf05ce61c15876f619750c99daa62..7f462d2825c1ac64061490d85b2d5f47036cada3 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/IMeasureOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/IMeasureOperation.cs
+@@ -1,12 +1,22 @@
+-
+-using Esri.ArcGISRuntime.Maui;
+-using Esri.ArcGISRuntime.UI;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Context;
++using WG.MiEditor.Shared.Models.Toolbar;
+ 
+ namespace WG.MiEditor.Core.Services.Drawing.Measurement.Operation;
+ 
+ public interface IMeasureOperation
+ {
+-    void Initialise(MapView mapView, GraphicsOverlay graphicsOverlay);
+-    void Start();
++    /// <summary>The toolbar tool this operation implements.</summary>
++    MeasureTool Tool { get; }
++
++    /// <summary>
++    /// Starts a measurement session against <paramref name="context"/>. If this throws, the
++    /// operation must have left nothing attached to the map.
++    /// </summary>
++    void Start(MeasurementContext context);
++
++    /// <summary>
++    /// Ends the session. Safe to call when not started. Every teardown step runs even if an
++    /// earlier one fails; failures are rethrown once teardown is complete.
++    /// </summary>
+     void Stop();
+ }
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/MeasureOperationBase.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/MeasureOperationBase.cs
+deleted file mode 100644
+index 873bc053b2e72b1debcccb80e2e4dcfe40911733..0000000000000000000000000000000000000000
+--- a/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/MeasureOperationBase.cs
++++ /dev/null
+@@ -1,197 +0,0 @@
+-
+-using CommunityToolkit.Mvvm.Messaging;
+-using Esri.ArcGISRuntime.Geometry;
+-using Esri.ArcGISRuntime.Maui;
+-using Esri.ArcGISRuntime.Symbology;
+-using Esri.ArcGISRuntime.UI;
+-using Esri.ArcGISRuntime.UI.Editing;
+-using WG.MiEditor.Shared.Messages.Measurement;
+-using WG.MiEditor.Shared.Models.Toolbar;
+-
+-namespace WG.MiEditor.Core.Services.Drawing.Measurement.Operation;
+-
+-public abstract class MeasureOperationBase(IMessenger messenger) : IMeasureOperation
+-{
+-    private bool isNewSketch;
+-
+-    protected abstract GeometryType GeometryType { get; }
+-    protected abstract Symbol? FinalGraphicSymbol { get; }
+-    protected abstract MeasureTool Tool { get; }
+-    protected virtual short MinVertexCount => 1;
+-
+-    protected readonly IMessenger Messenger = messenger;
+-    protected MapView? MapView { get; private set; }
+-    protected GraphicsOverlay? GraphicsOverlay { get; private set; }
+-    protected GeometryEditor GeometryEditor => MapView!.GeometryEditor!;
+-    protected Graphic? CurrentlyEditingGraphic { get; set; }
+-    protected MapViewInteractionOptions? DefaultMapViewInteractionOptions { get; private set; }
+-
+-    public virtual void Initialise(MapView mapView, GraphicsOverlay graphicsOverlay)
+-    {
+-        MapView = mapView;
+-        if (MapView != null)
+-        {
+-            DefaultMapViewInteractionOptions = MapView!.InteractionOptions!;
+-        }
+-        GraphicsOverlay = graphicsOverlay;
+-    }
+-
+-    public virtual void Start()
+-    {
+-        MapView!.GeoViewDoubleTapped += MapView_GeoViewDoubleTapped;
+-        MapView!.GeometryEditor!.Tool = new VertexTool
+-        {            
+-            Style = new GeometryEditorStyle
+-            {
+-                VertexSymbol = new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Circle, System.Drawing.Color.Red, 6),
+-                SelectedVertexSymbol = new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Circle, System.Drawing.Color.Red, 6),
+-                SelectedMidVertexSymbol = new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Circle, System.Drawing.Color.Red, 6),
+-                MidVertexSymbol = new SimpleMarkerSymbol(SimpleMarkerSymbolStyle.Square, System.Drawing.Color.Red, 6),
+-                VertexTextSymbol = null
+-            }
+-        };
+-        
+-        GeometryEditor.PropertyChanged += GeometryEditor_PropertyChanged;
+-        DisableDefaultInteractionOptions();
+-
+-        GeometryEditor.Start(GeometryType);
+-        Messenger.Send(new SketchingStartedMessage<MeasureTool>(Tool));
+-    }
+-
+-    public virtual void Stop()
+-    {
+-        MapView!.GeoViewDoubleTapped -= MapView_GeoViewDoubleTapped;
+-        GeometryEditor.PropertyChanged -= GeometryEditor_PropertyChanged;
+-
+-        if (GeometryEditor.IsStarted) GeometryEditor.Stop();
+-        if (CurrentlyEditingGraphic != null)
+-        {
+-            CurrentlyEditingGraphic.IsSelected = false;
+-            Clear();
+-            CurrentlyEditingGraphic = null;
+-        }
+-
+-        DefaultMapViewInteractionOptions = null;
+-
+-        Messenger.Send(new SketchingCompletedMessage<MeasureTool>(Tool));
+-    }
+-
+-    protected virtual  void MapView_GeoViewDoubleTapped(object? sender, GeoViewInputEventArgs e)
+-    {
+-        if (!GeometryEditor.IsStarted || GeometryEditor.Geometry?.GeometryType != GeometryType) return;
+-        e.Handled = true;
+-        EnableDefaultInteractionOptions();
+-
+-        var finalGeometry = GeometryEditor.Stop();
+-        if (!IsGeometryValid(finalGeometry!))
+-        {
+-            OnGeometryInvalid();
+-            RestartGeometryEditor(GeometryType);
+-            return;
+-        }
+-
+-        CreateGraphic(finalGeometry!, FinalGraphicSymbol);
+-        GeometryEditor.Start(GeometryType);
+-        isNewSketch = true;
+-    }
+-
+-    protected virtual void GeometryEditor_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+-    {
+-        if (e.PropertyName != nameof(GeometryEditor.Geometry) || GeometryEditor.Geometry is null) return;
+-
+-        if (isNewSketch)
+-        {
+-            Clear();
+-            isNewSketch = false;
+-        }
+-
+-        var geometry = GeometryEditor.Geometry;
+-        double? length = null;
+-        double? area = null;
+-
+-        if (geometry is Polyline line)
+-        {
+-            length = line.LengthGeodetic(LinearUnits.Meters, GeodeticCurveType.Geodesic);
+-        }
+-        else if (geometry is Polygon polygon)
+-        {
+-            length = polygon.LengthGeodetic(LinearUnits.Meters, GeodeticCurveType.Geodesic);
+-            area = polygon.AreaGeodetic(AreaUnits.SquareMeters, GeodeticCurveType.Geodesic);
+-        }
+-
+-        if (length > 0 || area > 0) Messenger.Send(new DrawingProgressMessage(length, area));
+-    }
+-
+-    protected virtual void OnGeometryInvalid() { }
+-
+-    protected void CreateGraphic(Geometry? geometry, Symbol? symbol)
+-    {
+-        if (geometry == null || geometry.IsEmpty || symbol == null) return;
+-
+-        var newGraphic = new Graphic(geometry, symbol);
+-
+-        GraphicsOverlay!.Graphics.Add(newGraphic);
+-        GraphicsOverlay.ClearSelection();
+-
+-        newGraphic.IsSelected = false;
+-        CurrentlyEditingGraphic = newGraphic;
+-    }
+-
+-    protected virtual void Clear()
+-    {
+-        if (CurrentlyEditingGraphic != null)
+-        {
+-            GraphicsOverlay!.Graphics.Remove(CurrentlyEditingGraphic);
+-            CurrentlyEditingGraphic = null;
+-        }
+-        GeometryEditor.ClearGeometry();
+-    }
+-
+-    private void RestartGeometryEditor(GeometryType geometryType)
+-    {
+-        if (!GeometryEditor.IsStarted)
+-        {
+-            GeometryEditor.Start(geometryType);
+-        }
+-    }
+-
+-    private void EnableDefaultInteractionOptions()
+-    {
+-        if (MapView != null)
+-        {
+-            MapView.InteractionOptions = DefaultMapViewInteractionOptions;
+-        }
+-    }
+-
+-    private void DisableDefaultInteractionOptions()
+-    {
+-        if (MapView != null)
+-        {
+-            MapView.InteractionOptions = new MapViewInteractionOptions { IsPanEnabled = false, IsZoomEnabled = false };
+-        }
+-    }
+-
+-
+-    private bool IsGeometryValid(Geometry geometry)
+-    {
+-        if (geometry == null || geometry.IsEmpty)
+-            return false;
+-
+-        if (geometry is Polyline line &&
+-            line.Parts.Count > 0 &&
+-            line.Parts[0].PointCount < MinVertexCount)
+-        {
+-            return false;
+-        }
+-
+-        if (geometry is Polygon polygon &&
+-            polygon.Parts.Count > 0 &&
+-            polygon.Parts[0].PointCount < MinVertexCount)
+-        {
+-            return false;
+-        }
+-
+-        return true;
+-    }
+-
+-}
+diff --git a/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/SheepMovementBufferOperation.cs b/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/SheepMovementBufferOperation.cs
+index 394666fb3811f8b2d8aa758badd6ca88c0d13026..73d8c1fa6902d157eb112635a448e6a433389e7c 100644
+--- a/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/SheepMovementBufferOperation.cs
++++ b/Src/MiEditor.Core/Services/Drawing/Measurement/Operation/SheepMovementBufferOperation.cs
+@@ -1,54 +1,122 @@
+-
+ using CommunityToolkit.Mvvm.Messaging;
+ using Esri.ArcGISRuntime.Geometry;
+ using Esri.ArcGISRuntime.Maui;
+ using Esri.ArcGISRuntime.Symbology;
++using Microsoft.Extensions.Options;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Context;
+ using WG.MiEditor.Shared.AutoScanning;
++using WG.MiEditor.Shared.Configuration.AppSettings;
+ using WG.MiEditor.Shared.Messages.Measurement;
+ using WG.MiEditor.Shared.Models.Toolbar;
+ 
+ namespace WG.MiEditor.Core.Services.Drawing.Measurement.Operation;
+ 
+-[RegisterService(ServiceLifetime.Scoped, As = new[] { typeof(IMeasureOperation) })]
+-public class SheepMovementBufferOperation : MeasureOperationBase
++/// <summary>
++/// Tap the map to draw a geodesic buffer of the configured radius around that point. Unlike the
++/// sketch tools it never touches the geometry editor or the map's pan/zoom settings; it only
++/// needs a result layer.
++/// </summary>
++[RegisterService(ServiceLifetime.Singleton, As = new[] { typeof(IMeasureOperation) })]
++public sealed class SheepMovementBufferOperation : IMeasureOperation
+ {
+-    protected override GeometryType GeometryType => GeometryType.Unknown;
+-    protected override Symbol? FinalGraphicSymbol => null;
+-    protected override MeasureTool Tool => MeasureTool.SheepMovementBuffer;
++    private const string Title = "Sheep Movement Buffer";
++
++    private readonly IMessenger messenger;
++    private readonly IMeasurementErrorReporter errorReporter;
++    private readonly Symbol circleSymbol;
+ 
++    private MapView? mapView;
++    private MeasurementResultLayer? results;
+     private double bufferRadius;
+ 
+-    public SheepMovementBufferOperation(IMessenger messenger) 
+-        : base(messenger) => Messenger.Register<SheepMovementBufferOperation, RadiusChangedMessage>(
+-            this, (_, message) => bufferRadius = message.Radius);
++    public SheepMovementBufferOperation(
++        IMessenger messenger,
++        IMeasurementErrorReporter errorReporter,
++        IOptions<SheepMovementBufferSettings> bufferSettings)
++    {
++        this.messenger = messenger;
++        this.errorReporter = errorReporter;
++
++        // Start from a valid radius so a tap can never buffer by zero. The live measurement panel
++        // replaces it with the user's value (always within the configured range) on start.
++        bufferRadius = bufferSettings.Value.MinRadius;
++
++        var circleOutline = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, System.Drawing.Color.Cyan, 2);
++        circleSymbol = new SimpleFillSymbol(
++            SimpleFillSymbolStyle.BackwardDiagonal,
++            System.Drawing.Color.FromArgb(80, 255, 128, 128),
++            circleOutline);
++
++        messenger.Register<SheepMovementBufferOperation, RadiusChangedMessage>(
++            this, (recipient, message) => recipient.bufferRadius = message.Radius);
++    }
++
++    public MeasureTool Tool => MeasureTool.SheepMovementBuffer;
+ 
+-    public override void Start()
++    public void Start(MeasurementContext context)
+     {
+-        MapView!.GeoViewTapped += MapView_GeoViewTapped;
+-        Messenger.Send(new SketchingStartedMessage<MeasureTool>(Tool));
++        ArgumentNullException.ThrowIfNull(context);
++
++        if (mapView is not null) Stop();
++
++        results = new MeasurementResultLayer(context.Overlay);
++        mapView = context.MapView;
++        mapView.GeoViewTapped += OnGeoViewTapped;
++
++        // Sent after the handler is attached: the live measurement panel replies synchronously
++        // with the validated radius.
++        messenger.Send(new SketchingStartedMessage<MeasureTool>(Tool));
+     }
+ 
+-    public override void Stop()
++    public void Stop()
+     {
+-        base.Stop();
+-        MapView!.GeoViewTapped -= MapView_GeoViewTapped;
++        if (mapView is null) return;
++
++        var view = mapView;
++        var resultLayer = results;
++        mapView = null;
++        results = null;
++
++        try
++        {
++            CleanupSteps.RunAll(
++                () => view.GeoViewTapped -= OnGeoViewTapped,
++                () => resultLayer?.Clear());
++        }
++        finally
++        {
++            messenger.Send(new SketchingCompletedMessage<MeasureTool>(Tool));
++        }
+     }
+ 
+-    private void MapView_GeoViewTapped(object? sender, GeoViewInputEventArgs e)
++    private void OnGeoViewTapped(object? sender, GeoViewInputEventArgs e)
+     {
+-        base.Clear();
+-        if (e.Location == null) return;
++        var resultLayer = results;
++        if (resultLayer is null || e.Location is null) return;
+ 
+-        var geometry = e.Location.BufferGeodetic(bufferRadius, LinearUnits.Meters);
++        // This tap belongs to the buffer tool; other map tap handlers must not act on it too.
++        e.Handled = true;
+ 
+-        var circleOutline = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, System.Drawing.Color.Cyan, 2);
+-        var circleSymbol = new SimpleFillSymbol(SimpleFillSymbolStyle.BackwardDiagonal, System.Drawing.Color.FromArgb(80, 255, 128, 128), circleOutline);
++        try
++        {
++            resultLayer.Clear();
++
++            if (bufferRadius <= 0) return;
++
++            var geometry = e.Location.BufferGeodetic(bufferRadius, LinearUnits.Meters);
++            if (geometry is null || geometry.IsEmpty) return;
+ 
+-        CreateGraphic(geometry, circleSymbol);
++            resultLayer.Show(geometry, circleSymbol);
+ 
+-        var circumference = geometry.LengthGeodetic(LinearUnits.Meters, GeodeticCurveType.Geodesic);
+-        var area = geometry.AreaGeodetic(AreaUnits.SquareMeters, GeodeticCurveType.Geodesic);
++            var circumference = geometry.LengthGeodetic(LinearUnits.Meters, GeodeticCurveType.Geodesic);
++            var area = geometry.AreaGeodetic(AreaUnits.SquareMeters, GeodeticCurveType.Geodesic);
+ 
+-        Messenger.Send(new DrawingProgressMessage(circumference, area));
++            messenger.Send(new DrawingProgressMessage(circumference, area));
++        }
++        catch (Exception ex)
++        {
++            errorReporter.Report(Title, ex);
++        }
+     }
+ }
+diff --git a/Src/MiEditor.MainApp/AutoScanning.cs b/Src/MiEditor.MainApp/AutoScanning.cs
+index 557ddac3f74ed472f07fad0ee2b0a978f8a4bd8c..48ab1f871278333e0d86d359e9cbc1765dd098ce 100644
+--- a/Src/MiEditor.MainApp/AutoScanning.cs
++++ b/Src/MiEditor.MainApp/AutoScanning.cs
+@@ -10,6 +10,7 @@ using WG.MiEditor.Core.Services.Drawing.Editing;
+ using WG.MiEditor.Core.Services.Drawing.Editing.AddFeatures.Manager;
+ using WG.MiEditor.Core.Services.Drawing.Editing.Managers;
+ using WG.MiEditor.Core.Services.Drawing.Editing.MergeFeature.Operation;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Components;
+ using WG.MiEditor.Core.Services.Drawing.Measurement.Manager;
+ using WG.MiEditor.Core.Services.FeatureGuide;
+ using WG.MiEditor.Core.Services.MapData;
+@@ -101,7 +102,8 @@ public static class AutoScanning
+             sp.GetRequiredService<IMessenger>(),
+             sp.GetRequiredService<IToolActivationCoordinator>(),
+             sp.GetRequiredService<IToolDescriptorRegistry>(),
+-            sp.GetRequiredService<IMeasureOperationManager>()));
++            sp.GetRequiredService<IMeasureOperationManager>(),
++            sp.GetRequiredService<IMeasurementErrorReporter>()));
+ 
+         services.AddSingleton(sp => new ToolbarControlViewModel(
+             sp.GetRequiredService<IMessenger>(),
+diff --git a/Src/MiEditor.MainApp/Converters/MeasureToolToIconConverter.cs b/Src/MiEditor.MainApp/Converters/MeasureToolToIconConverter.cs
+deleted file mode 100644
+index ff9836c22a296ccbed7c073c054b8db809925e54..0000000000000000000000000000000000000000
+--- a/Src/MiEditor.MainApp/Converters/MeasureToolToIconConverter.cs
++++ /dev/null
+@@ -1,27 +0,0 @@
+-
+-using System.Globalization;
+-using WG.MiEditor.Shared.Models.Toolbar;
+-
+-namespace WG.MiEditor.MainApp.Converters
+-{
+-    public class MeasureToolToIconConverter : IValueConverter
+-    {
+-        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+-        {
+-            if (value is not MeasureTool toolType) return "?";
+-
+-            return toolType.Name switch
+-            {
+-                "Distance" => Application.Current!.Resources["IconDistance"] as string,
+-                "Area" => Application.Current!.Resources["IconArea"] as string,
+-                "SheepMovementBuffer" => Application.Current!.Resources["IconCircleM"] as string,
+-                _ => "?"
+-            };
+-        }
+-
+-        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+-        {
+-            throw new NotImplementedException();
+-        }
+-    }
+-}
+diff --git a/Src/MiEditor.MainApp/ViewModels/Aoi/AoiControlViewModel.cs b/Src/MiEditor.MainApp/ViewModels/Aoi/AoiControlViewModel.cs
+index 21714f80ec2e404f64b89aacc9545521caf5857f..95d7ec2300d57a4b15b1cb89a3123f41f63429e4 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Aoi/AoiControlViewModel.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Aoi/AoiControlViewModel.cs
+@@ -20,6 +20,7 @@ using WG.MiEditor.Models;
+ using WG.MiEditor.Models.Drawing;
+ using WG.MiEditor.Shared.AutoScanning;
+ using WG.MiEditor.Shared.Messages.Map;
++using WG.MiEditor.Shared.Messages.Measurement;
+ using WG.MiEditor.Shared.Models.Notifications;
+ using WG.MiEditor.Shared.Models.Toolbar;
+ 
+@@ -32,7 +33,9 @@ public partial class AoiControlViewModel : ObservableRecipient,
+         IRecipient<DefineManulAoiMessage>,
+         IRecipient<DeleteManualAoiMessage>,
+         IRecipient<DefineAutoAoiMessage>,
+-        IRecipient<SaveAoiMessage>
++        IRecipient<SaveAoiMessage>,
++        IRecipient<StopAoiInteractionMessage>,
++        IRecipient<MeasurementInProgressMessage>
+ {
+     private readonly IAreaOfInterestService areaOfInterestService;
+     private readonly IOperationFeedbackService feedbackService;
+@@ -49,6 +52,10 @@ public partial class AoiControlViewModel : ObservableRecipient,
+     private MapView? mapView = null!;
+     private List<Geometry> AoiGeometrys = [];
+ 
++    // The map's geometry editor is shared with the measure and editing tools. Each tool assigns
++    // its own VertexTool, so this identifies whether the running session is the AOI drawing.
++    private VertexTool? aoiVertexTool;
++
+     public AoiControlViewModel(
+         IMessenger messenger,
+         IAreaOfInterestService areaOfInterestService,
+@@ -112,7 +119,7 @@ public partial class AoiControlViewModel : ObservableRecipient,
+ 
+         if (this.mapView?.GeometryEditor != null)
+         {
+-            this.mapView.GeometryEditor.Tool = new VertexTool
++            aoiVertexTool = new VertexTool
+             {
+                 Style = new GeometryEditorStyle
+                 {
+@@ -122,12 +129,30 @@ public partial class AoiControlViewModel : ObservableRecipient,
+                     VertexTextSymbol = null,
+                 }
+             };
++
++            // Any other tool's session should already have been ended through the activation
++            // coordinator; this only clears a stale one so Start cannot throw.
++            if (this.mapView.GeometryEditor.IsStarted) this.mapView.GeometryEditor.Stop();
++
++            this.mapView.GeometryEditor.Tool = aoiVertexTool;
+             this.mapView.GeoViewDoubleTapped += OnMapDoubleTapped;
+ 
+             this.mapView.GeometryEditor.Start(GeometryType.Polygon);
+         }
+     }
+ 
++    public void Receive(StopAoiInteractionMessage message) => StopAoiInteraction();
++
++    // A measurement is starting. AoiControl also resets the tool, but only while it is loaded;
++    // this makes sure AOI stops drawing and listening to taps regardless.
++    public void Receive(MeasurementInProgressMessage message) => StopAoiInteraction();
++
++    private void StopAoiInteraction()
++    {
++        StopGeometryEditor();
++        ActiveTool = new();
++    }
++
+     public async void Receive(SaveAoiMessage message)
+     {
+         StopGeometryEditor();
+@@ -178,6 +203,9 @@ public partial class AoiControlViewModel : ObservableRecipient,
+ 
+     private async void OnMapTapped(object? sender, GeoViewInputEventArgs e)
+     {
++        // Another tool (for example the sheep movement buffer) has already consumed this tap.
++        if (e.Handled) return;
++
+         try
+         {
+             switch (ActiveTool.Name)
+@@ -205,8 +233,7 @@ public partial class AoiControlViewModel : ObservableRecipient,
+         {
+             if (this.mapView == null) return;
+ 
+-            if (ActiveTool.Equals(AoiTool.DrawAOI) &&
+-                this.mapView.GeometryEditor!.IsStarted)
++            if (ActiveTool.Equals(AoiTool.DrawAOI) && IsAoiDrawing())
+             {
+ 
+                 e.Handled = true;
+@@ -262,9 +289,10 @@ public partial class AoiControlViewModel : ObservableRecipient,
+     {
+         if (this.mapView != null)
+         {
+-            if (this.mapView.GeometryEditor?.IsStarted == true)
++            // Only end the AOI's own drawing session; never stop a measurement or edit in progress.
++            if (IsAoiDrawing())
+             {
+-                this.mapView.GeometryEditor.ClearGeometry();
++                this.mapView.GeometryEditor!.ClearGeometry();
+                 this.mapView.GeometryEditor.Stop();
+             }
+ 
+@@ -486,8 +514,22 @@ public partial class AoiControlViewModel : ObservableRecipient,
+ 
+     private void RestartGeometryEditor()
+     {
+-        this.mapView?.GeometryEditor?.ClearGeometry();
+-        this.mapView?.GeometryEditor?.Start(GeometryType.Polygon);
++        var editor = this.mapView?.GeometryEditor;
++
++        // The session may have been handed to another tool while the AOI request was in flight.
++        if (editor is null || aoiVertexTool is null || !ReferenceEquals(editor.Tool, aoiVertexTool) || !ActiveTool.Equals(AoiTool.DrawAOI))
++        {
++            return;
++        }
++
++        editor.ClearGeometry();
++        if (!editor.IsStarted) editor.Start(GeometryType.Polygon);
++    }
++
++    private bool IsAoiDrawing()
++    {
++        var editor = this.mapView?.GeometryEditor;
++        return editor is not null && editor.IsStarted && aoiVertexTool is not null && ReferenceEquals(editor.Tool, aoiVertexTool);
+     }
+     private async Task SaveAreaOfInterest()
+     {
+diff --git a/Src/MiEditor.MainApp/ViewModels/Aoi/AoiToolbarControlViewModel.cs b/Src/MiEditor.MainApp/ViewModels/Aoi/AoiToolbarControlViewModel.cs
+index 2b10d2ed9fa1cab89040da718df61a5b677bf280..829112749f71bc9d22c15649c0980e33bb4f8c2c 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Aoi/AoiToolbarControlViewModel.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Aoi/AoiToolbarControlViewModel.cs
+@@ -18,12 +18,14 @@ public partial class AoiToolbarControlViewModel : ObservableRecipient,
+     IRecipient<DefineAoiMessage>
+ {
+     private readonly ToolActivationController<AoiTool> controller;
++    private readonly IToolActivationCoordinator coordinator;
+ 
+     public AoiToolbarControlViewModel(
+         IMessenger messenger,
+         IToolActivationCoordinator coordinator,
+         IToolDescriptorRegistry registry) : base(messenger)
+     {
++        this.coordinator = coordinator;
+         controller = new ToolActivationController<AoiTool>(coordinator, OnActivate, OnDeactivate);
+         BuildTools(registry);
+ 
+@@ -53,7 +55,7 @@ public partial class AoiToolbarControlViewModel : ObservableRecipient,
+     // The AOI toolbar's dispatch. Auto AOI and Draw AOI are sticky modes; delete, save,
+     // and clear are momentary actions. Every selection also refreshes the information
+     // panel. Cross-toolbar deactivation now runs through the coordinator.
+-    private Task OnActivate(AoiTool tool)
++    private async Task OnActivate(AoiTool tool)
+     {
+         if (tool == AoiTool.AutoAOI)
+         {
+@@ -69,6 +71,9 @@ public partial class AoiToolbarControlViewModel : ObservableRecipient,
+         }
+         else if (tool == AoiTool.Delete)
+         {
++            // Delete is a momentary button but it arms a map-tap handler, so another toolbar's
++            // mode (a measurement, an edit) must end first or the same tap would drive both.
++            await coordinator.DeactivateOthersAsync(controller);
+             Messenger.Send(new DeleteManualAoiMessage());
+         }
+         else if (tool == AoiTool.Clear)
+@@ -77,10 +82,15 @@ public partial class AoiToolbarControlViewModel : ObservableRecipient,
+         }
+ 
+         Messenger.Send(new SendInformationPanelMessage(tool));
+-        return Task.CompletedTask;
+     }
+ 
+-    private static Task OnDeactivate() => Task.CompletedTask;
++    // Turning an AOI mode off (re-click, or another toolbar taking over through the coordinator)
++    // must actually release the map: stop the AOI drawing session and detach its tap handlers.
++    private Task OnDeactivate()
++    {
++        Messenger.Send(new StopAoiInteractionMessage());
++        return Task.CompletedTask;
++    }
+ 
+     public void Receive(DefineAoiMessage message) => ShowAoiToolbar = message.IsEnable;
+ 
+diff --git a/Src/MiEditor.MainApp/ViewModels/Measurement/LiveMeasurementViewModel.cs b/Src/MiEditor.MainApp/ViewModels/Measurement/LiveMeasurementViewModel.cs
+index e9863cd8894b3398f12f5c62bbec18194b21a344..0e7a890ffae316fb2275609439241ecf0929ba86 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Measurement/LiveMeasurementViewModel.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Measurement/LiveMeasurementViewModel.cs
+@@ -1,9 +1,11 @@
+ 
++
+ using CommunityToolkit.Mvvm.ComponentModel;
+ using CommunityToolkit.Mvvm.Input;
+ using CommunityToolkit.Mvvm.Messaging;
+ using Microsoft.Extensions.Options;
+ using System.Collections.ObjectModel;
++using System.Globalization;
+ using WG.MiEditor.Core.Services.Notifications;
+ using WG.MiEditor.Shared.AutoScanning;
+ using WG.MiEditor.Shared.Configuration.AppSettings;
+@@ -29,6 +31,10 @@ public partial class LiveMeasurementViewModel : ObservableRecipient,
+     private double length;
+     private double lastValidRadius;
+ 
++    // The radius text most recently validated. Completed and Unfocused both fire when the user
++    // presses Enter, so without this an invalid entry would raise the same error twice.
++    private string? lastValidatedRadiusText;
++
+     private readonly ICollection<ITool> areaTools = [
+         MeasureTool.Area,
+         EditingTool.AddPolygon,
+@@ -77,33 +83,46 @@ public partial class LiveMeasurementViewModel : ObservableRecipient,
+     public partial string LengthLabel { get; set; } = "Length:";
+ 
+     [ObservableProperty]
+-    public partial string SelectedAreaUnit { get; set; } = "sq.m";
++    public partial MeasurementUnit SelectedAreaUnit { get; set; } = MeasurementUnit.SquareMetres;
+ 
+     [ObservableProperty]
+-    public partial string SelectedLengthUnit { get; set; } = "m";
+-    public ObservableCollection<string> AreaUnits { get; } = ["sq.m", "ha"];
+-    public ObservableCollection<string> LengthUnits { get; } = ["m", "km"];
++    public partial MeasurementUnit SelectedLengthUnit { get; set; } = MeasurementUnit.Metres;
++
++    public ObservableCollection<MeasurementUnit> AreaUnits { get; } = [.. MeasurementUnit.AreaUnits];
++    public ObservableCollection<MeasurementUnit> LengthUnits { get; } = [.. MeasurementUnit.LengthUnits];
+ 
++    // Bound to the radius box's Completed and Unfocused events.
+     [RelayCommand]
+-    private void ValidateRadius()
++    private void ValidateRadius() => ApplyRadius(force: false);
++
++    /// <summary>
++    /// Validates the radius text and tells the buffer tool which radius to use. With
++    /// <paramref name="force"/> the radius is (re)sent even if the text has not changed, which is
++    /// needed whenever the buffer tool starts.
++    /// </summary>
++    private void ApplyRadius(bool force)
+     {
+-        if (!double.TryParse(DefaultRadius, out var radius))
++        var text = DefaultRadius;
++        if (!force && text == lastValidatedRadiusText) return;
++
++        if (!RadiusInput.TryParse(text, CultureInfo.CurrentCulture, out var radius))
+         {
+             this.notificationManager.Show("Sheep Movement Buffer", $"Please enter a valid number for the buffer radius.", NotificationType.Error);
+-            DefaultRadius = this.lastValidRadius.ToString();
++            RevertToLastValidRadius();
+ 
+             return;
+         }
+ 
+         if (!IsSupportedRadius(radius))
+         {
+-            this.notificationManager.Show("Sheep Movement Buffer", $"{radius} is not a valid buffer radius. The supported range for the buffer radius is between {bufferSettings.MinRadius}m and {bufferSettings.MaxRadius}m.", NotificationType.Error);
+-            DefaultRadius = this.lastValidRadius.ToString();
++            this.notificationManager.Show("Sheep Movement Buffer", $"{RadiusInput.Format(radius, CultureInfo.CurrentCulture)} is not a valid buffer radius. The supported range for the buffer radius is between {bufferSettings.MinRadius}m and {bufferSettings.MaxRadius}m.", NotificationType.Error);
++            RevertToLastValidRadius();
+ 
+             return;
+         }
+ 
+         this.lastValidRadius = radius;
++        this.lastValidatedRadiusText = text;
+         this.Messenger.Send(new RadiusChangedMessage(radius));
+     }
+ 
+@@ -111,7 +130,7 @@ public partial class LiveMeasurementViewModel : ObservableRecipient,
+     {
+         ToggleComponentsVisibility(message.Tool, true);
+ 
+-        if (this.IsRadiusInputVisible) ValidateRadius();
++        if (this.IsRadiusInputVisible) ApplyRadius(force: true);
+ 
+         InitDefaultArea();
+         InitDefaultLength();
+@@ -128,7 +147,7 @@ public partial class LiveMeasurementViewModel : ObservableRecipient,
+     {
+         ToggleComponentsVisibility(message.Tool, true);
+ 
+-        if (this.IsRadiusInputVisible) ValidateRadius();
++        if (this.IsRadiusInputVisible) ApplyRadius(force: true);
+ 
+         InitDefaultArea();
+         InitDefaultLength();
+@@ -154,29 +173,25 @@ public partial class LiveMeasurementViewModel : ObservableRecipient,
+         SetAreaIfRequired(message);
+     }
+ 
+-    partial void OnSelectedAreaUnitChanged(string oldValue, string newValue) => this.AreaValue = GetArea(this.area);
++    partial void OnSelectedAreaUnitChanged(MeasurementUnit value) => this.AreaValue = GetArea(this.area);
+ 
+-    partial void OnSelectedLengthUnitChanged(string oldValue, string newValue) => this.LengthValue = GetLength(this.length);
++    partial void OnSelectedLengthUnitChanged(MeasurementUnit value) => this.LengthValue = GetLength(this.length);
+ 
+-    private string GetLength(double value) => SelectedLengthUnit switch
+-    {
+-        "m" => $"{value:N2}",
+-        "km" => $"{value / 1000:N2}",
+-        _ => string.Empty
+-    };
++    // The picker can push null (for example while its items are being reset), so fall back to
++    // the default unit rather than failing.
++    private string GetLength(double value) =>
++        (SelectedLengthUnit ?? MeasurementUnit.Metres).Format(value, CultureInfo.CurrentCulture);
+ 
+-    private string GetArea(double value) => SelectedAreaUnit switch
+-    {
+-        "sq.m" => $"{value:N2}",
+-        "ha" => $"{(value / 10_000d):N4}",
+-        _ => string.Empty
+-    };
++    private string GetArea(double value) =>
++        (SelectedAreaUnit ?? MeasurementUnit.SquareMetres).Format(value, CultureInfo.CurrentCulture);
+ 
++    // Zero is a real reading (for example after undoing vertices) and is shown as such; only a
++    // missing or non-finite value leaves the field blank.
+     private void SetAreaIfRequired(DrawingProgressMessage message)
+     {
+-        if (message.Area.HasValue && message.Area > 0)
++        if (message.Area is { } newArea && double.IsFinite(newArea) && newArea >= 0)
+         {
+-            this.area = message.Area.Value;
++            this.area = newArea;
+             this.AreaValue = GetArea(area);
+ 
+             return;
+@@ -187,9 +202,9 @@ public partial class LiveMeasurementViewModel : ObservableRecipient,
+ 
+     private void SetLengthIfRequired(DrawingProgressMessage message)
+     {
+-        if (message.Length.HasValue && message.Length > 0)
++        if (message.Length is { } newLength && double.IsFinite(newLength) && newLength >= 0)
+         {
+-            this.length = message.Length.Value;
++            this.length = newLength;
+             this.LengthValue = GetLength(length);
+ 
+             return;
+@@ -198,18 +213,27 @@ public partial class LiveMeasurementViewModel : ObservableRecipient,
+         this.LengthValue = string.Empty;
+     }
+ 
++    // Put the box back to the last good value and make sure the buffer tool is using that same
++    // value, so what is drawn always matches what is shown.
++    private void RevertToLastValidRadius()
++    {
++        DefaultRadius = RadiusInput.Format(this.lastValidRadius, CultureInfo.CurrentCulture);
++        this.lastValidatedRadiusText = DefaultRadius;
++        this.Messenger.Send(new RadiusChangedMessage(this.lastValidRadius));
++    }
++
+     private bool IsSupportedRadius(double value) => value >= this.bufferSettings.MinRadius && value <= this.bufferSettings.MaxRadius;
+ 
+     private void InitialiseDefaultRadius()
+     {
+-        if (double.TryParse(DefaultRadius, out var radius) && IsSupportedRadius(radius))
++        if (RadiusInput.TryParse(DefaultRadius, CultureInfo.CurrentCulture, out var radius) && IsSupportedRadius(radius))
+         {
+             lastValidRadius = radius;
+             return;
+         }
+ 
+         lastValidRadius = bufferSettings.MinRadius;
+-        DefaultRadius = lastValidRadius.ToString();
++        DefaultRadius = RadiusInput.Format(lastValidRadius, CultureInfo.CurrentCulture);
+     }
+ 
+     private void InitDefaultLength()
+diff --git a/Src/MiEditor.MainApp/ViewModels/Measurement/MeasurementToolGroupViewModel.cs b/Src/MiEditor.MainApp/ViewModels/Measurement/MeasurementToolGroupViewModel.cs
+index a38d07c773f9ff7f531207abd328cbf91b3f2a4f..b3989f0d441ff72c9a45e1b7e91db53e92f55e5c 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Measurement/MeasurementToolGroupViewModel.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Measurement/MeasurementToolGroupViewModel.cs
+@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
+ using CommunityToolkit.Mvvm.Messaging;
+ using System.Collections.ObjectModel;
+ using System.ComponentModel;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Components;
+ using WG.MiEditor.Core.Services.Drawing.Measurement.Manager;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar.Activation;
+@@ -18,6 +19,8 @@ namespace WG.MiEditor.MainApp.ViewModels.Measurement;
+ // child's icon, or the default measure icon when none is active.
+ public partial class MeasurementToolGroupViewModel : ObservableRecipient
+ {
++    private const string ErrorTitle = "Measurement";
++
+     private readonly IMeasureOperationManager drawingManager;
+     private readonly ToolActivationController<MeasureTool> controller;
+     private readonly IconButtonControlViewModel<MeasureTool> defaultTool;
+@@ -27,10 +30,18 @@ public partial class MeasurementToolGroupViewModel : ObservableRecipient
+         IMessenger messenger,
+         IToolActivationCoordinator coordinator,
+         IToolDescriptorRegistry registry,
+-        IMeasureOperationManager drawingManager) : base(messenger)
++        IMeasureOperationManager drawingManager,
++        IMeasurementErrorReporter errorReporter) : base(messenger)
+     {
+         this.drawingManager = drawingManager;
+-        controller = new ToolActivationController<MeasureTool>(coordinator, OnActivate, OnDeactivate);
++
++        // A failed activation is rolled back by the controller (the button does not stay lit)
++        // and reported here, rather than vanishing in the fire-and-forget button command.
++        controller = new ToolActivationController<MeasureTool>(
++            coordinator,
++            OnActivate,
++            OnDeactivate,
++            onError: ex => errorReporter.Report(ErrorTitle, ex));
+         BuildTools(registry);
+ 
+         // The anchor's click toggles the flyout (this is the reliable open path for touch,
+diff --git a/Src/MiEditor.MainApp/ViewModels/Measurement/MeasurementUnit.cs b/Src/MiEditor.MainApp/ViewModels/Measurement/MeasurementUnit.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..e9b003a24df167900ef428d62260e539781ce6aa
+--- /dev/null
++++ b/Src/MiEditor.MainApp/ViewModels/Measurement/MeasurementUnit.cs
+@@ -0,0 +1,26 @@
++using System.Globalization;
++
++namespace WG.MiEditor.MainApp.ViewModels.Measurement;
++
++/// <summary>
++/// A display unit for live measurements. Values arrive in base units (metres or square metres)
++/// and are converted and formatted here, so unit handling is not spread across string switches.
++/// <see cref="ToString"/> returns the label, which is what the unit pickers display.
++/// </summary>
++public sealed record MeasurementUnit(string Label, double BaseUnitsPerUnit, int Decimals)
++{
++    public static readonly MeasurementUnit Metres = new("m", 1, 2);
++    public static readonly MeasurementUnit Kilometres = new("km", 1_000, 2);
++    public static readonly MeasurementUnit SquareMetres = new("sq.m", 1, 2);
++    public static readonly MeasurementUnit Hectares = new("ha", 10_000, 4);
++
++    public static IReadOnlyList<MeasurementUnit> LengthUnits { get; } = [Metres, Kilometres];
++
++    public static IReadOnlyList<MeasurementUnit> AreaUnits { get; } = [SquareMetres, Hectares];
++
++    /// <summary>Converts a value in base units to this unit and formats it for display.</summary>
++    public string Format(double baseValue, CultureInfo culture) =>
++        (baseValue / BaseUnitsPerUnit).ToString($"N{Decimals}", culture);
++
++    public override string ToString() => Label;
++}
+diff --git a/Src/MiEditor.MainApp/ViewModels/Measurement/RadiusInput.cs b/Src/MiEditor.MainApp/ViewModels/Measurement/RadiusInput.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..1bd7f2d225c6411f8ce4df54467b523a84d9f913
+--- /dev/null
++++ b/Src/MiEditor.MainApp/ViewModels/Measurement/RadiusInput.cs
+@@ -0,0 +1,31 @@
++using System.Globalization;
++
++namespace WG.MiEditor.MainApp.ViewModels.Measurement;
++
++/// <summary>
++/// Parses the buffer radius the user types. Accepts the device's own number format first, then
++/// the invariant one, so "500.5" works on a device that uses a comma as the decimal separator.
++/// Thousands separators are only tried last, so they can never silently turn a decimal point
++/// into a grouping (for example "500.5" read as 5005).
++/// </summary>
++public static class RadiusInput
++{
++    public static bool TryParse(string? text, CultureInfo culture, out double radius)
++    {
++        radius = 0;
++        if (string.IsNullOrWhiteSpace(text)) return false;
++
++        var trimmed = text.Trim();
++
++        var parsed =
++            double.TryParse(trimmed, NumberStyles.Float, culture, out radius) ||
++            double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out radius) ||
++            double.TryParse(trimmed, NumberStyles.Float | NumberStyles.AllowThousands, culture, out radius);
++
++        // NaN and infinity parse successfully but are never a usable radius.
++        return parsed && double.IsFinite(radius);
++    }
++
++    /// <summary>Formats a radius so that <see cref="TryParse"/> reads it back unchanged.</summary>
++    public static string Format(double radius, CultureInfo culture) => radius.ToString(culture);
++}
+diff --git a/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/IToolActivationCoordinator.cs b/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/IToolActivationCoordinator.cs
+index 9017020717c47acf468ced22c82fec53b6459c43..eba1d277903eadb5f3651a55b102667836c3cbd9 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/IToolActivationCoordinator.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/IToolActivationCoordinator.cs
+@@ -19,4 +19,11 @@ public interface IToolActivationCoordinator
+     /// example after a toggle-off.
+     /// </summary>
+     void NotifyDeactivated(IToolActivationController controller);
++
++    /// <summary>
++    /// Deactivates the active controller when it is not <paramref name="requester"/>. For
++    /// momentary actions that still take over map input (for example AOI delete, which
++    /// listens for a tap) and so must not run alongside another toolbar's mode.
++    /// </summary>
++    Task DeactivateOthersAsync(IToolActivationController requester);
+ }
+diff --git a/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/ToolActivationController.cs b/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/ToolActivationController.cs
+index befb7739b02a5e967cf3424cae7aeffcdd3f2371..06e936af025220e704a58a8483d937ea8461371d 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/ToolActivationController.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/ToolActivationController.cs
+@@ -11,16 +11,23 @@ namespace WG.MiEditor.MainApp.ViewModels.Toolbar.Activation;
+ /// toggle off onreclick. A view model composes one of these rather than inheriting a
+ /// base class. Activation is routed to the toolbar's own backend through the dispatch
+ /// delegates, so the controller knows nothing about any operation service.
++/// <para>
++/// If the backend fails while activating a mode, the toolbar state is rolled back so the
++/// UI never shows a tool as active when it is not running. Failures are passed to
++/// <c>onError</c> when one is supplied; otherwise they propagate as before.
++/// </para>
+ /// </summary>
+ /// <param name="coordinator">Enforces the cross-toolbar single active tool rule.</param>
+ /// <param name="onActivate">Routes a mode activation or fires an action to the toolbar's backend.</param>
+ /// <param name="onDeactivate">Routes a deactivation to the toolbar's backend.</param>
+ /// <param name="tools">Optional initial tool buttons.</param>
++/// <param name="onError">Optional sink for backend failures (log and notify). When supplied, failures are handled and not rethrown.</param>
+ public sealed partial class ToolActivationController<T>(
+     IToolActivationCoordinator coordinator,
+     Func<T, Task> onActivate,
+     Func<Task> onDeactivate,
+-    IEnumerable<IconButtonControlViewModel<T>>? tools = null) : ObservableObject, IToolActivationController
++    IEnumerable<IconButtonControlViewModel<T>>? tools = null,
++    Action<Exception>? onError = null) : ObservableObject, IToolActivationController
+     where T : ITool
+ {
+ 
+@@ -41,9 +48,10 @@ public sealed partial class ToolActivationController<T>(
+     /// <summary>
+     /// Fire and forget entry for a button command, which is synchronous. The activation
+     /// chain is awaited internally so this is not an async void; it routes to the tool
+-    /// overload by token, which the button supplies.
++    /// overload by token, which the button supplies. Nothing escapes unobserved: any
++    /// failure reaches <c>onError</c> when one is supplied.
+     /// </summary>
+-    public void HandleSelected(T tool) => _ = HandleSelectedAsync(tool);
++    public void HandleSelected(T tool) => _ = HandleSelectedSafelyAsync(tool);
+ 
+     /// <summary>Handles selection by tool token, resolving the owning button.</summary>
+     public Task HandleSelectedAsync(T tool)
+@@ -61,7 +69,15 @@ public sealed partial class ToolActivationController<T>(
+     {
+         if (button.Activation == ToolActivation.Action)
+         {
+-            await onActivate(button.Tool);
++            try
++            {
++                await onActivate(button.Tool);
++            }
++            catch (Exception ex) when (onError is not null)
++            {
++                onError(ex);
++            }
++
+             return;
+         }
+ 
+@@ -79,8 +95,18 @@ public sealed partial class ToolActivationController<T>(
+         button.IsActive = true;
+         ActiveTool = button;
+ 
+-        await coordinator.NotifyActivatedAsync(this);
+-        await onActivate(button.Tool);
++        try
++        {
++            await coordinator.NotifyActivatedAsync(this);
++            await onActivate(button.Tool);
++        }
++        catch (Exception ex)
++        {
++            await RollBackAsync(button);
++
++            if (onError is null) throw;
++            onError(ex);
++        }
+     }
+ 
+     public async Task DeactivateExternallyAsync()
+@@ -92,7 +118,16 @@ public sealed partial class ToolActivationController<T>(
+ 
+         ActiveTool.IsActive = false;
+         ActiveTool = null;
+-        await onDeactivate();
++
++        // A failure here must not break the other toolbar's activation that triggered it.
++        try
++        {
++            await onDeactivate();
++        }
++        catch (Exception ex) when (onError is not null)
++        {
++            onError(ex);
++        }
+     }
+ 
+     private async Task ToggleOffAsync()
+@@ -104,6 +139,50 @@ public sealed partial class ToolActivationController<T>(
+         }
+ 
+         coordinator.NotifyDeactivated(this);
+-        await onDeactivate();
++
++        try
++        {
++            await onDeactivate();
++        }
++        catch (Exception ex) when (onError is not null)
++        {
++            onError(ex);
++        }
++    }
++
++    // Undo a failed activation: clear the active state, release the coordinator and give the
++    // backend a chance to tear down anything it half started.
++    private async Task RollBackAsync(IconButtonControlViewModel<T> button)
++    {
++        button.IsActive = false;
++        if (ReferenceEquals(ActiveTool, button))
++        {
++            ActiveTool = null;
++        }
++
++        coordinator.NotifyDeactivated(this);
++
++        try
++        {
++            await onDeactivate();
++        }
++        catch (Exception cleanupError)
++        {
++            onError?.Invoke(cleanupError);
++        }
++    }
++
++    private async Task HandleSelectedSafelyAsync(T tool)
++    {
++        try
++        {
++            await HandleSelectedAsync(tool);
++        }
++        catch (Exception ex)
++        {
++            // Only reachable without an onError sink; the toolbar state has already been
++            // rolled back. Matches the previous fire-and-forget behaviour.
++            System.Diagnostics.Debug.WriteLine($"Tool activation failed: {ex}");
++        }
+     }
+ }
+diff --git a/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/ToolActivationCoordinator.cs b/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/ToolActivationCoordinator.cs
+index 54028303534b1a1e0743585d1728149d0d183513..ab5e62c811d0314e854cc728a3c24c5e5fb3edc8 100644
+--- a/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/ToolActivationCoordinator.cs
++++ b/Src/MiEditor.MainApp/ViewModels/Toolbar/Activation/ToolActivationCoordinator.cs
+@@ -23,6 +23,18 @@ public sealed class ToolActivationCoordinator : IToolActivationCoordinator
+         active = controller;
+     }
+ 
++    public async Task DeactivateOthersAsync(IToolActivationController requester)
++    {
++        if (active is null || ReferenceEquals(active, requester))
++        {
++            return;
++        }
++
++        var previous = active;
++        active = null;
++        await previous.DeactivateExternallyAsync();
++    }
++
+     public void NotifyDeactivated(IToolActivationController controller)
+     {
+         if (ReferenceEquals(active, controller))
+diff --git a/Src/MiEditor.Shared/Messages/Aoi/DefineAoiMessages.cs b/Src/MiEditor.Shared/Messages/Aoi/DefineAoiMessages.cs
+index 5282cdc957a34849f828a8427927de17be545698..2d84b2fc7c7ef25423702108a5f48e5f46c83f62 100644
+--- a/Src/MiEditor.Shared/Messages/Aoi/DefineAoiMessages.cs
++++ b/Src/MiEditor.Shared/Messages/Aoi/DefineAoiMessages.cs
+@@ -13,4 +13,11 @@ namespace WG.MiEditor.Messages.Aoi
+     public sealed record AoiGeometryHighlightMessage(Geometry Geometry);
+     public sealed record ResetAoiToolbarActiveStateMessage();
+     public sealed record DeleteManualAoiMessage();
++
++    /// <summary>
++    /// The AOI toolbar's active mode was turned off, either by the user or because another
++    /// toolbar (for example a measure tool) took over. AOI must stop drawing and stop
++    /// listening to map taps so it cannot interfere with the tool that took over.
++    /// </summary>
++    public sealed record StopAoiInteractionMessage();
+ }
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/CleanupStepsTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/CleanupStepsTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5273828b13cd9dc315edbfaf577676af566684a
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/CleanupStepsTests.cs
+@@ -0,0 +1,40 @@
++using WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Measurement;
++
++public class CleanupStepsTests
++{
++    [Fact]
++    public void RunAll_RunsEveryStep_WhenNoneFail()
++    {
++        var ran = new List<int>();
++
++        CleanupSteps.RunAll(() => ran.Add(1), () => ran.Add(2), () => ran.Add(3));
++
++        Assert.Equal([1, 2, 3], ran);
++    }
++
++    [Fact]
++    public void RunAll_RunsLaterSteps_AfterAFailure_AndRethrowsIt()
++    {
++        var ran = new List<int>();
++
++        var ex = Assert.Throws<InvalidOperationException>(() => CleanupSteps.RunAll(
++            () => ran.Add(1),
++            () => throw new InvalidOperationException("first"),
++            () => ran.Add(3)));
++
++        Assert.Equal("first", ex.Message);
++        Assert.Equal([1, 3], ran);
++    }
++
++    [Fact]
++    public void RunAll_AggregatesMultipleFailures()
++    {
++        var ex = Assert.Throws<AggregateException>(() => CleanupSteps.RunAll(
++            () => throw new InvalidOperationException("a"),
++            () => throw new ArgumentException("b")));
++
++        Assert.Equal(2, ex.InnerExceptions.Count);
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MapInteractionLockTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MapInteractionLockTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..9c0ceebab9b4d602f44c91b89cf03a38b3d32e5b
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MapInteractionLockTests.cs
+@@ -0,0 +1,101 @@
++using Esri.ArcGISRuntime.UI;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Measurement;
++
++public class MapInteractionLockTests
++{
++    private readonly MapInteractionLock sut = new();
++    private MapViewInteractionOptions? options;
++
++    private void Lock() => sut.Lock(() => options, value => options = value);
++
++    [Fact]
++    public void Lock_DisablesPanAndZoom()
++    {
++        options = new MapViewInteractionOptions { IsPanEnabled = true, IsZoomEnabled = true };
++
++        Lock();
++
++        Assert.True(sut.IsLocked);
++        Assert.False(options!.IsPanEnabled);
++        Assert.False(options.IsZoomEnabled);
++    }
++
++    [Fact]
++    public void Release_RestoresTheOriginalOptions()
++    {
++        var original = new MapViewInteractionOptions { IsPanEnabled = true, IsZoomEnabled = true };
++        options = original;
++
++        Lock();
++        sut.Release();
++
++        Assert.False(sut.IsLocked);
++        Assert.Same(original, options);
++    }
++
++    [Fact]
++    public void Release_RestoresNull_WhenTheMapHadNoExplicitOptions()
++    {
++        options = null;
++
++        Lock();
++        sut.Release();
++
++        Assert.Null(options);
++    }
++
++    [Fact]
++    public void LockTwice_KeepsTheFirstOriginal()
++    {
++        var original = new MapViewInteractionOptions();
++        options = original;
++
++        Lock();
++        Lock();
++        sut.Release();
++
++        Assert.Same(original, options);
++    }
++
++    [Fact]
++    public void Release_WithoutLock_DoesNothing()
++    {
++        var original = new MapViewInteractionOptions();
++        options = original;
++
++        sut.Release();
++
++        Assert.Same(original, options);
++    }
++
++    // Regression: the old base class captured options once at start-up and nulled them on stop,
++    // so the second session restored null and pan/zoom could be left disabled.
++    [Fact]
++    public void SecondSession_RestoresTheOptionsInForceWhenItStarted()
++    {
++        options = new MapViewInteractionOptions();
++        Lock();
++        sut.Release();
++
++        var changedInBetween = new MapViewInteractionOptions { IsRotateEnabled = false };
++        options = changedInBetween;
++
++        Lock();
++        sut.Release();
++
++        Assert.Same(changedInBetween, options);
++    }
++
++    [Fact]
++    public void Release_WhenRestoreThrows_DoesNotStayLocked()
++    {
++        var shouldThrow = false;
++        sut.Lock(() => null, _ => { if (shouldThrow) throw new InvalidOperationException(); });
++        shouldThrow = true;
++
++        Assert.Throws<InvalidOperationException>(sut.Release);
++        Assert.False(sut.IsLocked);
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MapViewMeasurementContextProviderTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MapViewMeasurementContextProviderTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..8e551f1b665f140a184b1a22ad55477fb3f9e133
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MapViewMeasurementContextProviderTests.cs
+@@ -0,0 +1,58 @@
++using Esri.ArcGISRuntime.Maui;
++using Esri.ArcGISRuntime.UI;
++using Moq;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Context;
++using WG.MiEditor.Core.Services.MapData;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Measurement;
++
++public class MapViewMeasurementContextProviderTests
++{
++    [Fact]
++    public async Task GetAsync_WhenMapIsNeverRegistered_ThrowsUnavailable_InsteadOfHanging()
++    {
++        var mapViewService = new Mock<IMapViewService>();
++        mapViewService.Setup(s => s.GetMapViewAsync()).Returns(new TaskCompletionSource<MapView>().Task);
++
++        var sut = new MapViewMeasurementContextProvider(mapViewService.Object, TimeSpan.FromMilliseconds(50));
++
++        await Assert.ThrowsAsync<MeasurementUnavailableException>(() => sut.GetAsync());
++    }
++
++    [Fact]
++    public async Task GetAsync_WhenMapIsNull_ThrowsUnavailable()
++    {
++        var mapViewService = new Mock<IMapViewService>();
++        mapViewService.Setup(s => s.GetMapViewAsync()).Returns(Task.FromResult<MapView>(null!));
++
++        var sut = new MapViewMeasurementContextProvider(mapViewService.Object);
++
++        await Assert.ThrowsAsync<MeasurementUnavailableException>(() => sut.GetAsync());
++    }
++
++    [Fact]
++    public void EnsureAttached_ReAddsAnOverlayThatWasCleared()
++    {
++        var overlays = new GraphicsOverlayCollection();
++        var overlay = new GraphicsOverlay { Id = MapViewMeasurementContextProvider.OverlayId };
++
++        MapViewMeasurementContextProvider.EnsureAttached(overlays, overlay);
++        overlays.Clear(); // what ZoomToFeatureControl does
++        MapViewMeasurementContextProvider.EnsureAttached(overlays, overlay);
++
++        Assert.Single(overlays);
++        Assert.Same(overlay, overlays[0]);
++    }
++
++    [Fact]
++    public void EnsureAttached_DoesNotAddTwice()
++    {
++        var overlays = new GraphicsOverlayCollection();
++        var overlay = new GraphicsOverlay();
++
++        MapViewMeasurementContextProvider.EnsureAttached(overlays, overlay);
++        MapViewMeasurementContextProvider.EnsureAttached(overlays, overlay);
++
++        Assert.Single(overlays);
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasureOperationManagerTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasureOperationManagerTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..c4b1b7d2c79d6aa3f98125ab18d6cc6bc1dcc52a
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasureOperationManagerTests.cs
+@@ -0,0 +1,234 @@
++using WG.MiEditor.Core.Services.Drawing.Measurement.Context;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Manager;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Operation;
++using WG.MiEditor.Shared.Models.Toolbar;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Measurement;
++
++public class MeasureOperationManagerTests
++{
++    // The manager only passes the context through to the operation, so the fakes never touch
++    // the map view or overlay and a live MAUI MapView is not needed here.
++    private static readonly MeasurementContext Context = new(null!, null!);
++
++    private readonly List<string> log = [];
++    private readonly FakeContextProvider provider;
++    private readonly FakeOperation distance;
++    private readonly FakeOperation area;
++    private readonly MeasureOperationManager sut;
++
++    public MeasureOperationManagerTests()
++    {
++        provider = new FakeContextProvider(log);
++        distance = new FakeOperation(MeasureTool.Distance, log);
++        area = new FakeOperation(MeasureTool.Area, log);
++        sut = new MeasureOperationManager(provider, [distance, area]);
++    }
++
++    [Fact]
++    public async Task Activate_StartsTheOperationWithAFreshContext()
++    {
++        await sut.Activate(MeasureTool.Distance);
++
++        Assert.Equal(1, distance.StartCount);
++        Assert.Same(Context, distance.LastContext);
++        Assert.Equal(1, provider.CallCount);
++    }
++
++    [Fact]
++    public async Task Activate_SameToolTwice_StartsItOnce()
++    {
++        await sut.Activate(MeasureTool.Distance);
++        await sut.Activate(MeasureTool.Distance);
++
++        Assert.Equal(1, distance.StartCount);
++        Assert.Equal(0, distance.StopCount);
++    }
++
++    [Fact]
++    public async Task Activate_AnotherTool_StopsThePreviousBeforeStartingTheNext()
++    {
++        await sut.Activate(MeasureTool.Distance);
++        log.Clear();
++
++        await sut.Activate(MeasureTool.Area);
++
++        Assert.Equal(["stop Distance", "context", "start Area"], log);
++    }
++
++    [Fact]
++    public async Task Activate_RequestsContextEveryTime_SoAnOverlayRemovedElsewhereIsReattached()
++    {
++        await sut.Activate(MeasureTool.Distance);
++        await sut.Deactivate();
++        await sut.Activate(MeasureTool.Distance);
++
++        Assert.Equal(2, provider.CallCount);
++    }
++
++    [Fact]
++    public async Task Activate_WhenMapNotReady_Throws_AndLeavesNothingActive()
++    {
++        provider.Failure = new MeasurementUnavailableException("The map is not ready yet.");
++
++        await Assert.ThrowsAsync<MeasurementUnavailableException>(() => sut.Activate(MeasureTool.Distance));
++
++        Assert.Equal(0, distance.StartCount);
++
++        await sut.Deactivate();
++        Assert.Equal(0, distance.StopCount);
++    }
++
++    [Fact]
++    public async Task Activate_AfterMapBecomesReady_Succeeds()
++    {
++        provider.Failure = new MeasurementUnavailableException("The map is not ready yet.");
++        await Assert.ThrowsAsync<MeasurementUnavailableException>(() => sut.Activate(MeasureTool.Distance));
++
++        provider.Failure = null;
++        await sut.Activate(MeasureTool.Distance);
++
++        Assert.Equal(1, distance.StartCount);
++    }
++
++    [Fact]
++    public async Task Activate_WhenStartThrows_DoesNotTreatTheOperationAsCurrent()
++    {
++        distance.StartFailure = new InvalidOperationException("boom");
++
++        await Assert.ThrowsAsync<InvalidOperationException>(() => sut.Activate(MeasureTool.Distance));
++
++        distance.StartFailure = null;
++        await sut.Activate(MeasureTool.Distance);
++
++        Assert.Equal(2, distance.StartCount);
++    }
++
++    [Fact]
++    public async Task Deactivate_WhenStopThrows_StillClearsTheCurrentOperation()
++    {
++        await sut.Activate(MeasureTool.Distance);
++        distance.StopFailure = new InvalidOperationException("boom");
++
++        await Assert.ThrowsAsync<InvalidOperationException>(() => sut.Deactivate());
++
++        // The failed operation was already forgotten, so a second deactivate does not retry it.
++        distance.StopFailure = null;
++        await sut.Deactivate();
++        Assert.Equal(0, distance.StopCount);
++
++        // The manager is not wedged: activating again starts afresh.
++        await sut.Activate(MeasureTool.Distance);
++        Assert.Equal(2, distance.StartCount);
++    }
++
++    [Fact]
++    public async Task Deactivate_WhenNothingActive_IsANoOp()
++    {
++        await sut.Deactivate();
++
++        Assert.Equal(0, distance.StopCount);
++        Assert.Equal(0, area.StopCount);
++    }
++
++    [Fact]
++    public async Task ConcurrentActivations_AreSerialised()
++    {
++        var gate = new TaskCompletionSource();
++        provider.Gate = gate.Task;
++
++        var first = sut.Activate(MeasureTool.Distance);
++        var second = sut.Activate(MeasureTool.Area);
++
++        // The second activation must not reach the provider while the first is still inside it.
++        Assert.Equal(1, provider.CallCount);
++
++        provider.Gate = null;
++        gate.SetResult();
++        await Task.WhenAll(first, second);
++
++        Assert.Equal(1, provider.MaxConcurrentCalls);
++        Assert.Equal(["context", "start Distance", "stop Distance", "context", "start Area"], log);
++    }
++
++    [Fact]
++    public async Task Activate_UnknownTool_Throws()
++    {
++        var manager = new MeasureOperationManager(provider, [distance]);
++
++        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.Activate(MeasureTool.Area));
++    }
++
++    [Fact]
++    public void Constructor_DuplicateOperationsForATool_Throws()
++    {
++        var duplicate = new FakeOperation(MeasureTool.Distance, log);
++
++        Assert.Throws<ArgumentException>(() => new MeasureOperationManager(provider, [distance, duplicate]));
++    }
++
++    private sealed class FakeContextProvider(List<string> log) : IMeasurementContextProvider
++    {
++        private int inFlight;
++
++        public int CallCount { get; private set; }
++
++        public int MaxConcurrentCalls { get; private set; }
++
++        public Exception? Failure { get; set; }
++
++        public Task? Gate { get; set; }
++
++        public async Task<MeasurementContext> GetAsync(CancellationToken cancellationToken = default)
++        {
++            CallCount++;
++            inFlight++;
++            MaxConcurrentCalls = Math.Max(MaxConcurrentCalls, inFlight);
++
++            try
++            {
++                if (Gate is { } gate) await gate;
++                if (Failure is { } failure) throw failure;
++
++                log.Add("context");
++                return Context;
++            }
++            finally
++            {
++                inFlight--;
++            }
++        }
++    }
++
++    private sealed class FakeOperation(MeasureTool tool, List<string> log) : IMeasureOperation
++    {
++        public MeasureTool Tool { get; } = tool;
++
++        public int StartCount { get; private set; }
++
++        public int StopCount { get; private set; }
++
++        public MeasurementContext? LastContext { get; private set; }
++
++        public Exception? StartFailure { get; set; }
++
++        public Exception? StopFailure { get; set; }
++
++        public void Start(MeasurementContext context)
++        {
++            StartCount++;
++            if (StartFailure is { } failure) throw failure;
++
++            LastContext = context;
++            log.Add($"start {Tool}");
++        }
++
++        public void Stop()
++        {
++            if (StopFailure is { } failure) throw failure;
++
++            StopCount++;
++            log.Add($"stop {Tool}");
++        }
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasurementErrorReporterTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasurementErrorReporterTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..bd5b8ea3904d10ada051276f7c6a082bd3d57019
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasurementErrorReporterTests.cs
+@@ -0,0 +1,47 @@
++using Moq;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Context;
++using WG.MiEditor.Core.Services.Notifications;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Shared.Models.Notifications;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Measurement;
++
++public class MeasurementErrorReporterTests
++{
++    private readonly Mock<ILoggerService> logger = new();
++    private readonly Mock<INotificationManager> notifications = new();
++    private readonly MeasurementErrorReporter sut;
++
++    public MeasurementErrorReporterTests() => sut = new MeasurementErrorReporter(logger.Object, notifications.Object);
++
++    [Fact]
++    public void Report_LogsTheException_AndShowsAGenericMessage()
++    {
++        var ex = new InvalidOperationException("internal detail");
++
++        sut.Report("Measurement", ex);
++
++        logger.Verify(l => l.Error(ex, It.IsAny<string>()), Times.Once);
++        notifications.Verify(n => n.Show("Measurement", MeasurementErrorReporter.GenericMessage, NotificationType.Error), Times.Once);
++    }
++
++    [Fact]
++    public void Report_ShowsTheUserFacingMessage_ForUnavailableMap()
++    {
++        sut.Report("Measurement", new MeasurementUnavailableException("The map is not ready yet."));
++
++        notifications.Verify(n => n.Show("Measurement", "The map is not ready yet.", NotificationType.Error), Times.Once);
++    }
++
++    [Fact]
++    public void Report_NeverThrows_EvenIfLoggingAndNotifyingFail()
++    {
++        logger.Setup(l => l.Error(It.IsAny<Exception>(), It.IsAny<string>())).Throws<InvalidOperationException>();
++        notifications.Setup(n => n.Show(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<NotificationType>())).Throws<InvalidOperationException>();
++
++        var thrown = Record.Exception(() => sut.Report("Measurement", new Exception()));
++
++        Assert.Null(thrown);
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasurementGeometryTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasurementGeometryTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..6f7cc92bcdb7f04420501d67648778508096355a
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasurementGeometryTests.cs
+@@ -0,0 +1,94 @@
++using Esri.ArcGISRuntime.Geometry;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Measurement;
++
++public class MeasurementGeometryTests
++{
++    private static readonly SpatialReference Wgs84 = SpatialReferences.Wgs84;
++
++    private static Polyline Line(int points) =>
++        new(Enumerable.Range(0, points).Select(i => new MapPoint(-3.2 + i * 0.01, 55.95, Wgs84)), Wgs84);
++
++    private static Polygon Square(int points) =>
++        new(new[]
++        {
++            new MapPoint(-3.20, 55.95, Wgs84),
++            new MapPoint(-3.19, 55.95, Wgs84),
++            new MapPoint(-3.19, 55.96, Wgs84),
++            new MapPoint(-3.20, 55.96, Wgs84)
++        }.Take(points), Wgs84);
++
++    [Fact]
++    public void HasMinimumVertices_NullOrEmpty_IsFalse()
++    {
++        Assert.False(MeasurementGeometry.HasMinimumVertices(null, 2));
++        Assert.False(MeasurementGeometry.HasMinimumVertices(new Polyline(Array.Empty<MapPoint>(), Wgs84), 2));
++    }
++
++    [Theory]
++    [InlineData(1, false)]
++    [InlineData(2, true)]
++    [InlineData(3, true)]
++    public void HasMinimumVertices_Polyline_NeedsTwoPoints(int points, bool expected)
++    {
++        Assert.Equal(expected, MeasurementGeometry.HasMinimumVertices(Line(points), 2));
++    }
++
++    [Theory]
++    [InlineData(2, false)]
++    [InlineData(3, true)]
++    [InlineData(4, true)]
++    public void HasMinimumVertices_Polygon_NeedsThreePoints(int points, bool expected)
++    {
++        Assert.Equal(expected, MeasurementGeometry.HasMinimumVertices(Square(points), 3));
++    }
++
++    [Fact]
++    public void Measure_Polyline_ReportsLengthOnly()
++    {
++        var progress = MeasurementGeometry.Measure(Line(2));
++
++        Assert.NotNull(progress);
++        Assert.True(progress!.Length > 0);
++        Assert.Null(progress.Area);
++    }
++
++    [Fact]
++    public void Measure_Polygon_ReportsLengthAndArea()
++    {
++        var progress = MeasurementGeometry.Measure(Square(4));
++
++        Assert.NotNull(progress);
++        Assert.True(progress!.Length > 0);
++        Assert.True(progress.Area > 0);
++    }
++
++    [Fact]
++    public void Measure_Null_ReturnsNull()
++    {
++        Assert.Null(MeasurementGeometry.Measure(null));
++    }
++
++    // Regression: readings used to be suppressed at zero, so undoing vertices left a stale value.
++    [Fact]
++    public void Measure_TooFewVertices_ReportsZero_NotNothing()
++    {
++        var line = MeasurementGeometry.Measure(Line(1));
++        Assert.NotNull(line);
++        Assert.Equal(0, line!.Length);
++
++        var polygon = MeasurementGeometry.Measure(new Polygon(Array.Empty<MapPoint>(), Wgs84));
++        Assert.NotNull(polygon);
++        Assert.Equal(0, polygon!.Length);
++        Assert.Equal(0, polygon.Area);
++    }
++
++    [Fact]
++    public void Empty_HasNoAreaForLines_AndZeroAreaForPolygons()
++    {
++        Assert.Null(MeasurementGeometry.Empty(GeometryType.Polyline).Area);
++        Assert.Equal(0, MeasurementGeometry.Empty(GeometryType.Polygon).Area);
++        Assert.Equal(0, MeasurementGeometry.Empty(GeometryType.Polyline).Length);
++    }
++}
+diff --git a/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasurementSymbolsTests.cs b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasurementSymbolsTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..113b65e36e76dbf9c469c9beb6d820d8f575acee
+--- /dev/null
++++ b/Tests/MiEditor.Core.Tests/Services/Drawing/Measurement/MeasurementSymbolsTests.cs
+@@ -0,0 +1,108 @@
++using Moq;
++using WG.MiEditor.Core.Services.Drawing;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++using WG.MiEditor.Logging.Abstractions;
++using WG.MiEditor.Models.Drawing;
++using Colour = System.Drawing.Color;
++
++namespace WG.MiEditor.Core.Tests.Services.Drawing.Measurement;
++
++// A typo in appsettings used to throw from Enum.Parse inside the operation constructors, which
++// broke the whole measurement toolbar. These pin the fall-back behaviour instead.
++public class MeasurementSymbolsTests
++{
++    private readonly Mock<ILoggerService> logger = new();
++    private readonly Mock<IDrawingSymbolColourParser> parser = new();
++
++    [Theory]
++    [InlineData("Friday", DayOfWeek.Friday)]
++    [InlineData("friday", DayOfWeek.Friday)]
++    [InlineData("  Friday  ", DayOfWeek.Friday)]
++    public void ParseStyle_AcceptsDefinedNames_IgnoringCaseAndWhitespace(string value, DayOfWeek expected)
++    {
++        Assert.Equal(expected, MeasurementSymbols.ParseStyle(value, DayOfWeek.Monday, "Test", logger.Object));
++        logger.Verify(l => l.Warn(It.IsAny<string>()), Times.Never);
++    }
++
++    [Theory]
++    [InlineData(null)]
++    [InlineData("")]
++    [InlineData("Fridya")]
++    [InlineData("5")]
++    [InlineData("99")]
++    public void ParseStyle_FallsBackAndWarns_OnBadValues(string? value)
++    {
++        Assert.Equal(DayOfWeek.Monday, MeasurementSymbols.ParseStyle(value, DayOfWeek.Monday, "Test", logger.Object));
++        logger.Verify(l => l.Warn(It.Is<string>(m => m.Contains("Test"))), Times.Once);
++    }
++
++    [Fact]
++    public void ParseStyle_StillReturnsFallback_WhenLoggingThrows()
++    {
++        logger.Setup(l => l.Warn(It.IsAny<string>())).Throws<InvalidOperationException>();
++
++        Assert.Equal(DayOfWeek.Monday, MeasurementSymbols.ParseStyle("nope", DayOfWeek.Monday, "Test", logger.Object));
++    }
++
++    [Fact]
++    public void ParseColour_UsesTheParser_WhenItSucceeds()
++    {
++        var setting = new ColourSetting { Hex = "#FF0000", Argb = new ArgbSetting() };
++        parser.Setup(p => p.FromSetting(setting)).Returns(Colour.Red);
++
++        var colour = MeasurementSymbols.ParseColour(setting, Colour.Blue, "Test", parser.Object, logger.Object);
++
++        Assert.Equal(Colour.Red, colour);
++    }
++
++    [Fact]
++    public void ParseColour_FallsBackAndWarns_WhenTheParserThrows()
++    {
++        var setting = new ColourSetting { Hex = "#ZZ", Argb = new ArgbSetting() };
++        parser.Setup(p => p.FromSetting(setting)).Throws<FormatException>();
++
++        var colour = MeasurementSymbols.ParseColour(setting, Colour.Blue, "Test", parser.Object, logger.Object);
++
++        Assert.Equal(Colour.Blue, colour);
++        logger.Verify(l => l.Warn(It.IsAny<string>()), Times.Once);
++    }
++
++    [Fact]
++    public void ParseColour_FallsBack_WhenTheSettingIsMissing()
++    {
++        var colour = MeasurementSymbols.ParseColour(null, Colour.Blue, "Test", parser.Object, logger.Object);
++
++        Assert.Equal(Colour.Blue, colour);
++    }
++
++    [Fact]
++    public void Line_WithMissingSettings_BuildsADefaultSymbol_InsteadOfThrowing()
++    {
++        var symbol = MeasurementSymbols.Line(null, parser.Object, logger.Object, "Line");
++
++        Assert.Equal(MeasurementSymbols.DefaultLineWidth, symbol.Width);
++        Assert.Equal(MeasurementSymbols.DefaultLineColour, symbol.Color);
++    }
++
++    [Fact]
++    public void Polygon_WithATypoInTheFillStyle_StillBuildsASymbol()
++    {
++        parser.Setup(p => p.FromSetting(It.IsAny<ColourSetting>())).Returns(Colour.Green);
++        var setting = new PolygonSymbolSetting
++        {
++            FillStyle = "Soild",
++            FillColour = new ColourSetting { Hex = "#00FF00", Argb = new ArgbSetting() },
++            Outline = new LineSymbolSetting
++            {
++                Style = "Solid",
++                Colour = new ColourSetting { Hex = "#00FF00", Argb = new ArgbSetting() },
++                Width = 1
++            }
++        };
++
++        var symbol = MeasurementSymbols.Polygon(setting, parser.Object, logger.Object, "Polygon");
++
++        Assert.NotNull(symbol);
++        Assert.NotNull(symbol.Outline);
++    }
++}
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/LiveMeasurementViewModelRadiusTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/LiveMeasurementViewModelRadiusTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..07ed09b328f441d85bb54eca98f65c25ec6c80fb
+--- /dev/null
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/LiveMeasurementViewModelRadiusTests.cs
+@@ -0,0 +1,100 @@
++using CommunityToolkit.Mvvm.Messaging;
++using Microsoft.Extensions.Options;
++using Moq;
++using WG.MiEditor.Core.Services.Notifications;
++using WG.MiEditor.MainApp.ViewModels.Measurement;
++using WG.MiEditor.Shared.Configuration.AppSettings;
++using WG.MiEditor.Shared.Messages.Measurement;
++using WG.MiEditor.Shared.Models.Notifications;
++using Xunit;
++
++namespace WG.MiEditor.MainApp.Tests.ViewModels.Measurement;
++
++// The buffer tool draws with the last RadiusChangedMessage it received, so every outcome of
++// validation must leave it holding the value the radius box shows.
++public class LiveMeasurementViewModelRadiusTests
++{
++    private readonly StrongReferenceMessenger messenger = new();
++    private readonly Mock<INotificationManager> notifications = new();
++    private readonly List<double> sentRadii = [];
++    private readonly LiveMeasurementViewModel sut;
++
++    public LiveMeasurementViewModelRadiusTests()
++    {
++        var settings = Options.Create(new SheepMovementBufferSettings { MinRadius = 500, MaxRadius = 100_000 });
++        sut = new LiveMeasurementViewModel(messenger, notifications.Object, settings);
++        messenger.Register<RadiusChangedMessage>(this, (_, m) => sentRadii.Add(m.Radius));
++    }
++
++    private void Enter(string text)
++    {
++        sut.DefaultRadius = text;
++        sut.ValidateRadiusCommand.Execute(null);
++    }
++
++    [Fact]
++    public void ValidRadius_IsSentToTheBufferTool()
++    {
++        Enter("2000");
++
++        Assert.Equal([2000d], sentRadii);
++    }
++
++    [Fact]
++    public void NonNumericRadius_RevertsTheBox_AndResendsTheLastValidRadius()
++    {
++        Enter("2000");
++
++        Enter("abc");
++
++        Assert.Equal("2000", sut.DefaultRadius);
++        Assert.Equal(2000d, sentRadii[^1]);
++        notifications.Verify(n => n.Show(It.IsAny<string>(), It.IsAny<string>(), NotificationType.Error), Times.Once);
++    }
++
++    [Fact]
++    public void OutOfRangeRadius_RevertsTheBox_AndResendsTheLastValidRadius()
++    {
++        Enter("2000");
++
++        Enter("5");
++
++        Assert.Equal("2000", sut.DefaultRadius);
++        Assert.Equal(2000d, sentRadii[^1]);
++    }
++
++    [Fact]
++    public void StartingTheBufferTool_AlwaysSendsAUsableRadius_EvenAfterBadInput()
++    {
++        sut.DefaultRadius = "not a number";
++
++        sut.Receive(new SketchingStartedMessage<WG.MiEditor.Shared.Models.Toolbar.MeasureTool>(
++            WG.MiEditor.Shared.Models.Toolbar.MeasureTool.SheepMovementBuffer));
++
++        Assert.NotEmpty(sentRadii);
++        Assert.InRange(sentRadii[^1], 500, 100_000);
++    }
++
++    // Pressing Enter raises Completed and then Unfocused; both run validation.
++    [Fact]
++    public void InvalidRadius_ValidatedTwiceByEnterThenUnfocus_ShowsOneError()
++    {
++        sut.DefaultRadius = "abc";
++
++        sut.ValidateRadiusCommand.Execute(null); // Completed
++        sut.ValidateRadiusCommand.Execute(null); // Unfocused
++
++        notifications.Verify(n => n.Show(It.IsAny<string>(), It.IsAny<string>(), NotificationType.Error), Times.Once);
++    }
++
++    [Fact]
++    public void ValidRadius_ValidatedTwice_IsSentOnce()
++    {
++        sut.DefaultRadius = "3000";
++
++        sut.ValidateRadiusCommand.Execute(null);
++        sut.ValidateRadiusCommand.Execute(null);
++
++        Assert.Equal([3000d], sentRadii);
++    }
++}
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/LiveMeasurementViewModelReadingTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/LiveMeasurementViewModelReadingTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..3ef28904417eb8d1b7200a6b207fc4b94b3bcf50
+--- /dev/null
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/LiveMeasurementViewModelReadingTests.cs
+@@ -0,0 +1,73 @@
++using CommunityToolkit.Mvvm.Messaging;
++using Microsoft.Extensions.Options;
++using Moq;
++using System.Globalization;
++using WG.MiEditor.Core.Services.Notifications;
++using WG.MiEditor.MainApp.ViewModels.Measurement;
++using WG.MiEditor.Shared.Configuration.AppSettings;
++using WG.MiEditor.Shared.Messages.Measurement;
++using WG.MiEditor.Shared.Models.Toolbar;
++using Xunit;
++
++namespace WG.MiEditor.MainApp.Tests.ViewModels.Measurement;
++
++public class LiveMeasurementViewModelReadingTests
++{
++    private readonly LiveMeasurementViewModel sut = new(
++        new StrongReferenceMessenger(),
++        new Mock<INotificationManager>().Object,
++        Options.Create(new SheepMovementBufferSettings { MinRadius = 500, MaxRadius = 100_000 }));
++
++    private static string Expected(double value, string format) => value.ToString(format, CultureInfo.CurrentCulture);
++
++    // Regression: zero readings used to be dropped, so undoing vertices left the old value showing.
++    [Fact]
++    public void ZeroReading_IsShown_RatherThanKeepingTheOldValue()
++    {
++        sut.Receive(new SketchingStartedMessage<MeasureTool>(MeasureTool.Area));
++        sut.Receive(new DrawingProgressMessage(120, 900));
++
++        sut.Receive(new DrawingProgressMessage(0, 0));
++
++        Assert.Equal(Expected(0, "N2"), sut.LengthValue);
++        Assert.Equal(Expected(0, "N2"), sut.AreaValue);
++    }
++
++    [Fact]
++    public void MissingOrNonFiniteReading_LeavesTheFieldBlank()
++    {
++        sut.Receive(new DrawingProgressMessage(double.NaN, null));
++
++        Assert.Equal(string.Empty, sut.LengthValue);
++        Assert.Equal(string.Empty, sut.AreaValue);
++    }
++
++    [Fact]
++    public void ChangingUnits_ReformatsTheCurrentReading()
++    {
++        sut.Receive(new DrawingProgressMessage(1_500, 25_000));
++
++        sut.SelectedLengthUnit = MeasurementUnit.Kilometres;
++        sut.SelectedAreaUnit = MeasurementUnit.Hectares;
++
++        Assert.Equal(Expected(1.5, "N2"), sut.LengthValue);
++        Assert.Equal(Expected(2.5, "N4"), sut.AreaValue);
++    }
++
++    [Fact]
++    public void NullUnitFromThePicker_FallsBackToTheDefaultUnit()
++    {
++        sut.Receive(new DrawingProgressMessage(1_500, 25_000));
++
++        sut.SelectedLengthUnit = null!;
++
++        Assert.Equal(Expected(1_500, "N2"), sut.LengthValue);
++    }
++
++    [Fact]
++    public void Units_DisplayTheirLabels()
++    {
++        Assert.Equal(["m", "km"], sut.LengthUnits.Select(u => u.ToString()));
++        Assert.Equal(["sq.m", "ha"], sut.AreaUnits.Select(u => u.ToString()));
++    }
++}
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/MeasureToolGroupViewModelTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/MeasureToolGroupViewModelTests.cs
+index b03cdd36463102f3d7f245d1e5953762ac943057..52a391ef8f4cf2c6c41c3ee677f5ff503e5ac1a2 100644
+--- a/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/MeasureToolGroupViewModelTests.cs
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/MeasureToolGroupViewModelTests.cs
+@@ -1,5 +1,7 @@
+ 
+ using CommunityToolkit.Mvvm.Messaging;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Components;
++using WG.MiEditor.Core.Services.Drawing.Measurement.Context;
+ using WG.MiEditor.Core.Services.Drawing.Measurement.Manager;
+ using WG.MiEditor.MainApp.ViewModels.Measurement;
+ using WG.MiEditor.MainApp.ViewModels.Toolbar;
+@@ -17,6 +19,7 @@ public class MeasurementToolGroupViewModelTests
+     private readonly StrongReferenceMessenger messenger = new();
+     private readonly ToolActivationCoordinator coordinator = new();
+     private readonly FakeMeasureOperationManager drawing = new();
++    private readonly FakeErrorReporter errors = new();
+ 
+     private readonly MeasurementToolGroupViewModel sut;
+ 
+@@ -29,7 +32,7 @@ public class MeasurementToolGroupViewModelTests
+             new SheepMovementBufferMeasureToolDescriptor()
+         ]);
+ 
+-        sut = new MeasurementToolGroupViewModel(messenger, coordinator, registry, drawing);
++        sut = new MeasurementToolGroupViewModel(messenger, coordinator, registry, drawing, errors);
+     }
+ 
+     private IconButtonControlViewModel<MeasureTool> Button(MeasureTool tool) => sut.FlyoutTools.First(t => t.Tool == tool);
+@@ -151,14 +154,75 @@ public class MeasurementToolGroupViewModelTests
+         Assert.True(Button(MeasureTool.Distance).IsActive);
+     }
+ 
++    [Fact]
++    public void ActivationFailure_RollsBackTheButtonAndAnchor_AndReportsTheError()
++    {
++        var failure = new MeasurementUnavailableException("The map is not ready yet.");
++        drawing.ActivateFailure = failure;
++
++        Click(MeasureTool.Distance);
++
++        Assert.False(Button(MeasureTool.Distance).IsActive);
++        Assert.Equal("measure.png", sut.CurrentIcon);
++        Assert.Same(failure, Assert.Single(errors.Reported));
++    }
++
++    [Fact]
++    public void ActivationFailure_TearsDownAnythingHalfStarted()
++    {
++        drawing.ActivateFailure = new InvalidOperationException("boom");
++
++        Click(MeasureTool.Area);
++
++        Assert.Equal(1, drawing.DeactivateCount);
++    }
++
++    [Fact]
++    public void AfterActivationFailure_TheToolCanBeSelectedAgain()
++    {
++        drawing.ActivateFailure = new InvalidOperationException("boom");
++        Click(MeasureTool.Distance);
++
++        drawing.ActivateFailure = null;
++        Click(MeasureTool.Distance);
++
++        Assert.True(Button(MeasureTool.Distance).IsActive);
++        Assert.Equal("measure_line.png", sut.CurrentIcon);
++    }
++
++    [Fact]
++    public void DeactivationFailure_IsReported_AndTheToolStillTurnsOff()
++    {
++        Click(MeasureTool.Distance);
++        drawing.DeactivateFailure = new InvalidOperationException("boom");
++
++        Click(MeasureTool.Distance);
++
++        Assert.False(Button(MeasureTool.Distance).IsActive);
++        Assert.Single(errors.Reported);
++    }
++
++    private sealed class FakeErrorReporter : IMeasurementErrorReporter
++    {
++        public List<Exception> Reported { get; } = [];
++
++        public void Report(string title, Exception exception) => Reported.Add(exception);
++    }
++
+     private sealed class FakeMeasureOperationManager : IMeasureOperationManager
+     {
+         public MeasureTool? LastActivated { get; private set; }
+ 
+         public int DeactivateCount { get; private set; }
+ 
++        public Exception? ActivateFailure { get; set; }
++
++        public Exception? DeactivateFailure { get; set; }
++
+         public Task Activate(MeasureTool tool)
+         {
++            if (ActivateFailure is { } failure) return Task.FromException(failure);
++
+             LastActivated = tool;
+             return Task.CompletedTask;
+         }
+@@ -166,7 +230,7 @@ public class MeasurementToolGroupViewModelTests
+         public Task Deactivate()
+         {
+             DeactivateCount++;
+-            return Task.CompletedTask;
++            return DeactivateFailure is { } failure ? Task.FromException(failure) : Task.CompletedTask;
+         }
+     }
+ }
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/RadiusInputTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/RadiusInputTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a96aabf622372153b56bbb7ffd42706044e2559d
+--- /dev/null
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Measurement/RadiusInputTests.cs
+@@ -0,0 +1,59 @@
++using System.Globalization;
++using WG.MiEditor.MainApp.ViewModels.Measurement;
++using Xunit;
++
++namespace WG.MiEditor.MainApp.Tests.ViewModels.Measurement;
++
++public class RadiusInputTests
++{
++    private static readonly CultureInfo UK = CultureInfo.GetCultureInfo("en-GB");
++    private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-DE");
++
++    [Theory]
++    [InlineData("500", 500)]
++    [InlineData(" 500 ", 500)]
++    [InlineData("500.5", 500.5)]
++    [InlineData("10,000", 10_000)]
++    [InlineData("1e3", 1_000)]
++    public void UkDevice(string text, double expected)
++    {
++        Assert.True(RadiusInput.TryParse(text, UK, out var radius));
++        Assert.Equal(expected, radius);
++    }
++
++    // Regression: double.TryParse with a comma-decimal culture read "500.5" as 5005.
++    [Theory]
++    [InlineData("500,5", 500.5)]
++    [InlineData("500.5", 500.5)]
++    [InlineData("10000", 10_000)]
++    public void CommaDecimalDevice(string text, double expected)
++    {
++        Assert.True(RadiusInput.TryParse(text, German, out var radius));
++        Assert.Equal(expected, radius);
++    }
++
++    [Theory]
++    [InlineData(null)]
++    [InlineData("")]
++    [InlineData("   ")]
++    [InlineData("abc")]
++    [InlineData("NaN")]
++    [InlineData("Infinity")]
++    [InlineData("-Infinity")]
++    public void RejectsUnusableInput(string? text)
++    {
++        Assert.False(RadiusInput.TryParse(text, UK, out _));
++    }
++
++    [Theory]
++    [InlineData(500.5)]
++    [InlineData(10_000)]
++    public void FormatRoundTrips_InTheSameCulture(double value)
++    {
++        foreach (var culture in new[] { UK, German, CultureInfo.InvariantCulture })
++        {
++            Assert.True(RadiusInput.TryParse(RadiusInput.Format(value, culture), culture, out var parsed));
++            Assert.Equal(value, parsed);
++        }
++    }
++}
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/AoiToolbarControlViewModelTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/AoiToolbarControlViewModelTests.cs
+index c1b5b48fd20a10c797ec76ce7e0f5e089d756e3e..43b3a721054e40ee4a35a5c1292b1dad7da84680 100644
+--- a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/AoiToolbarControlViewModelTests.cs
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/AoiToolbarControlViewModelTests.cs
+@@ -137,4 +137,61 @@ public class AoiToolbarControlViewModelTests
+ 
+         Assert.False(otherButton.IsActive);
+     }
++
++    [Fact]
++    public void TogglingOffAnAoiMode_TellsAoiToStopInteracting()
++    {
++        var stopped = 0;
++        messenger.Register<StopAoiInteractionMessage>(this, (_, _) => stopped++);
++
++        Click(AoiTool.DrawAOI);
++        Click(AoiTool.DrawAOI);
++
++        Assert.Equal(1, stopped);
++    }
++
++    [Fact]
++    public void AnotherToolbarTakingOver_TellsAoiToStopInteracting()
++    {
++        var stopped = 0;
++        messenger.Register<StopAoiInteractionMessage>(this, (_, _) => stopped++);
++        Click(AoiTool.DrawAOI);
++
++        var otherButton = new IconButtonControlViewModel<MeasureTool>(MeasureTool.Area, "x.png", _ => { });
++        var other = new ToolActivationController<MeasureTool>(
++            coordinator, _ => Task.CompletedTask, () => Task.CompletedTask, [otherButton]);
++        other.HandleSelected(MeasureTool.Area);
++
++        Assert.False(Button(AoiTool.DrawAOI).IsActive);
++        Assert.Equal(1, stopped);
++    }
++
++    [Fact]
++    public void Delete_EndsAnotherToolbarsActiveMode_BeforeArmingTheMapTap()
++    {
++        var order = new List<string>();
++        var otherButton = new IconButtonControlViewModel<MeasureTool>(MeasureTool.Area, "x.png", _ => { });
++        var other = new ToolActivationController<MeasureTool>(
++            coordinator,
++            _ => Task.CompletedTask,
++            () => { order.Add("measure stopped"); return Task.CompletedTask; },
++            [otherButton]);
++        other.HandleSelected(MeasureTool.Area);
++        messenger.Register<DeleteManualAoiMessage>(this, (_, _) => order.Add("delete armed"));
++
++        Click(AoiTool.Delete);
++
++        Assert.False(otherButton.IsActive);
++        Assert.Equal(["measure stopped", "delete armed"], order);
++    }
++
++    [Fact]
++    public void Delete_LeavesTheAoiToolbarsOwnModeActive()
++    {
++        Click(AoiTool.AutoAOI);
++
++        Click(AoiTool.Delete);
++
++        Assert.True(Button(AoiTool.AutoAOI).IsActive);
++    }
+ }
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolActivationControllerErrorHandlingTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolActivationControllerErrorHandlingTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..270301bdbbfe39d8827dbd3c7fd8edee5be94eaf
+--- /dev/null
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolActivationControllerErrorHandlingTests.cs
+@@ -0,0 +1,156 @@
++using WG.MiEditor.MainApp.ViewModels.Toolbar;
++using WG.MiEditor.MainApp.ViewModels.Toolbar.Activation;
++using WG.MiEditor.Shared.Models.Toolbar;
++using Xunit;
++
++namespace WG.MiEditor.MainApp.Tests.ViewModels.Toolbar;
++
++public class ToolActivationControllerErrorHandlingTests
++{
++    private readonly ToolActivationCoordinator coordinator = new();
++    private readonly List<Exception> errors = [];
++
++    private Exception? activateFailure;
++    private Exception? deactivateFailure;
++    private int deactivateCount;
++
++    private static IconButtonControlViewModel<MeasureTool> Mode(MeasureTool tool) =>
++        new(tool, "icon.png", _ => { }, activation: ToolActivation.Mode);
++
++    private static IconButtonControlViewModel<MeasureTool> Action(MeasureTool tool) =>
++        new(tool, "icon.png", _ => { }, activation: ToolActivation.Action);
++
++    private ToolActivationController<MeasureTool> Create(
++        IEnumerable<IconButtonControlViewModel<MeasureTool>> buttons,
++        bool withErrorSink = true) =>
++        new(
++            coordinator,
++            _ => activateFailure is null ? Task.CompletedTask : Task.FromException(activateFailure),
++            () =>
++            {
++                deactivateCount++;
++                return deactivateFailure is null ? Task.CompletedTask : Task.FromException(deactivateFailure);
++            },
++            buttons,
++            withErrorSink ? errors.Add : null);
++
++    [Fact]
++    public async Task ActivationFailure_RollsBackActiveState_AndReports()
++    {
++        var button = Mode(MeasureTool.Distance);
++        var sut = Create([button]);
++        activateFailure = new InvalidOperationException("boom");
++
++        await sut.HandleSelectedAsync(button);
++
++        Assert.False(button.IsActive);
++        Assert.Null(sut.ActiveTool);
++        Assert.Same(activateFailure, Assert.Single(errors));
++        Assert.Equal(1, deactivateCount);
++    }
++
++    [Fact]
++    public async Task ActivationFailure_ReleasesTheCoordinator()
++    {
++        var button = Mode(MeasureTool.Distance);
++        var sut = Create([button]);
++        activateFailure = new InvalidOperationException("boom");
++        await sut.HandleSelectedAsync(button);
++        deactivateCount = 0;
++
++        // Another toolbar activating must not try to deactivate the rolled-back controller.
++        var other = new RecordingController();
++        await coordinator.NotifyActivatedAsync(other);
++
++        Assert.Equal(0, deactivateCount);
++    }
++
++    [Fact]
++    public async Task ActivationFailure_WithoutErrorSink_StillRollsBack_AndRethrows()
++    {
++        var button = Mode(MeasureTool.Distance);
++        var sut = Create([button], withErrorSink: false);
++        activateFailure = new InvalidOperationException("boom");
++
++        await Assert.ThrowsAsync<InvalidOperationException>(() => sut.HandleSelectedAsync(button));
++
++        Assert.False(button.IsActive);
++        Assert.Null(sut.ActiveTool);
++    }
++
++    [Fact]
++    public void HandleSelected_WithoutErrorSink_DoesNotLeakAnUnobservedException()
++    {
++        var button = Mode(MeasureTool.Distance);
++        var sut = Create([button], withErrorSink: false);
++        activateFailure = new InvalidOperationException("boom");
++
++        var thrown = Record.Exception(() => sut.HandleSelected(MeasureTool.Distance));
++
++        Assert.Null(thrown);
++        Assert.False(button.IsActive);
++    }
++
++    [Fact]
++    public async Task ActivationAndCleanupBothFail_BothAreReported()
++    {
++        var button = Mode(MeasureTool.Distance);
++        var sut = Create([button]);
++        activateFailure = new InvalidOperationException("activate");
++        deactivateFailure = new InvalidOperationException("cleanup");
++
++        await sut.HandleSelectedAsync(button);
++
++        Assert.Equal(2, errors.Count);
++        Assert.False(button.IsActive);
++    }
++
++    [Fact]
++    public async Task ActionFailure_IsReported_AndNeverSetsActiveState()
++    {
++        var button = Action(MeasureTool.Distance);
++        var sut = Create([button]);
++        activateFailure = new InvalidOperationException("boom");
++
++        await sut.HandleSelectedAsync(button);
++
++        Assert.False(button.IsActive);
++        Assert.Single(errors);
++    }
++
++    [Fact]
++    public async Task ToggleOffFailure_IsReported_AndTheToolIsStillOff()
++    {
++        var button = Mode(MeasureTool.Distance);
++        var sut = Create([button]);
++        await sut.HandleSelectedAsync(button);
++        deactivateFailure = new InvalidOperationException("boom");
++
++        await sut.HandleSelectedAsync(button);
++
++        Assert.False(button.IsActive);
++        Assert.Null(sut.ActiveTool);
++        Assert.Single(errors);
++    }
++
++    [Fact]
++    public async Task ExternalDeactivationFailure_IsReported_AndDoesNotBreakTheOtherToolbar()
++    {
++        var button = Mode(MeasureTool.Distance);
++        var sut = Create([button]);
++        await sut.HandleSelectedAsync(button);
++        deactivateFailure = new InvalidOperationException("boom");
++
++        var other = new RecordingController();
++        var thrown = await Record.ExceptionAsync(() => coordinator.NotifyActivatedAsync(other));
++
++        Assert.Null(thrown);
++        Assert.False(button.IsActive);
++        Assert.Single(errors);
++    }
++
++    private sealed class RecordingController : IToolActivationController
++    {
++        public Task DeactivateExternallyAsync() => Task.CompletedTask;
++    }
++}
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolActivationCoordinatorTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolActivationCoordinatorTests.cs
+index 705ed32ffde28616c9c1b56646da94093922dfc4..9c07c7c19171335f35294f1072747b0375b3ff80 100644
+--- a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolActivationCoordinatorTests.cs
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolActivationCoordinatorTests.cs
+@@ -86,6 +86,41 @@ public class ToolActivationCoordinatorTests
+         Assert.Equal(1, first.DeactivateCount);
+     }
+ 
++    [Fact]
++    public async Task DeactivateOthers_DeactivatesTheActiveController_AndClearsIt()
++    {
++        var active = new RecordingController();
++        var requester = new RecordingController();
++        await coordinator.NotifyActivatedAsync(active);
++
++        await coordinator.DeactivateOthersAsync(requester);
++
++        Assert.Equal(1, active.DeactivateCount);
++
++        // Nothing is active any more, so a later activation deactivates nobody.
++        await coordinator.NotifyActivatedAsync(new RecordingController());
++        Assert.Equal(1, active.DeactivateCount);
++    }
++
++    [Fact]
++    public async Task DeactivateOthers_LeavesTheRequesterActive()
++    {
++        var requester = new RecordingController();
++        await coordinator.NotifyActivatedAsync(requester);
++
++        await coordinator.DeactivateOthersAsync(requester);
++
++        Assert.Equal(0, requester.DeactivateCount);
++    }
++
++    [Fact]
++    public async Task DeactivateOthers_WhenNothingActive_IsANoOp()
++    {
++        var thrown = await Record.ExceptionAsync(() => coordinator.DeactivateOthersAsync(new RecordingController()));
++
++        Assert.Null(thrown);
++    }
++
+     private sealed class RecordingController : IToolActivationController
+     {
+         public int DeactivateCount { get; private set; }
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarActivationControllerTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarActivationControllerTests.cs
+index 2960a8527832941ca92f45cc64d84c2d01f289f2..d2400fa049bbf1b8782cd85b3b6805c5638fbde3 100644
+--- a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarActivationControllerTests.cs
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolbarActivationControllerTests.cs
+@@ -146,5 +146,7 @@ public class ToolActivationControllerTests
+ 
+         public void NotifyDeactivated(IToolActivationController controller) =>
+             Deactivated.Add(controller);
++
++        public Task DeactivateOthersAsync(IToolActivationController requester) => Task.CompletedTask;
+     }
+ }

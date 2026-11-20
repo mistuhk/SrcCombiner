@@ -1,0 +1,127 @@
+diff --git a/Src/MiEditor.Shared/Models/Toolbar/AoiTool.cs b/Src/MiEditor.Shared/Models/Toolbar/AoiTool.cs
+index 4ce5d2809e66782b0abba3bd237de7688bc01e3f..d7b271611f0850ccafbbbd0fdf8d05f7cd94f090 100644
+--- a/Src/MiEditor.Shared/Models/Toolbar/AoiTool.cs
++++ b/Src/MiEditor.Shared/Models/Toolbar/AoiTool.cs
+@@ -17,10 +17,11 @@ public readonly struct AoiTool : ITool, IEquatable<AoiTool>
+ 
+     public static readonly IEnumerable<AoiTool> All = new[] { DrawAOI, AutoAOI, Save, Clear, Delete };
+ 
+-    public override string ToString() => Name;
++    public override string ToString() => Name ?? string.Empty;
+     public bool Equals(AoiTool other) => Name == other.Name;
+     public override bool Equals(object? obj) => obj is AoiTool other && Equals(other);
+-    public override int GetHashCode() => Name.GetHashCode();
++    // A default (unselected) tool has a null Name; hashing it must not throw.
++    public override int GetHashCode() => Name?.GetHashCode() ?? 0;
+     public static bool operator ==(AoiTool left, AoiTool right) => left.Equals(right);
+     public static bool operator !=(AoiTool left, AoiTool right) => !left.Equals(right);
+ }
+diff --git a/Src/MiEditor.Shared/Models/Toolbar/EditingTool.cs b/Src/MiEditor.Shared/Models/Toolbar/EditingTool.cs
+index fbd1755f884425eca1a1fa911e89f2b6df7f0c5c..7d92f293d69b788deabbba2d8363a678e47ec148 100644
+--- a/Src/MiEditor.Shared/Models/Toolbar/EditingTool.cs
++++ b/Src/MiEditor.Shared/Models/Toolbar/EditingTool.cs
+@@ -64,10 +64,11 @@ public readonly struct EditingTool : ITool, IEquatable<EditingTool>
+         Buffer
+     ];
+ 
+-    public override string ToString() => Name;
++    public override string ToString() => Name ?? string.Empty;
+     public bool Equals(EditingTool other) => Name == other.Name;
+     public override bool Equals(object? obj) => obj is EditingTool other && Equals(other);
+-    public override int GetHashCode() => Name.GetHashCode();
++    // A default (unselected) tool has a null Name; hashing it must not throw.
++    public override int GetHashCode() => Name?.GetHashCode() ?? 0;
+     public static bool operator ==(EditingTool left, EditingTool right) => left.Equals(right);
+     public static bool operator !=(EditingTool left, EditingTool right) => !left.Equals(right);
+ }
+diff --git a/Src/MiEditor.Shared/Models/Toolbar/MeasureTool.cs b/Src/MiEditor.Shared/Models/Toolbar/MeasureTool.cs
+index ffce7857b0cc613903e1c03a9053278b6ae1a7a2..1737731228a8d1512e4ac9a69753cac1f9fd058a 100644
+--- a/Src/MiEditor.Shared/Models/Toolbar/MeasureTool.cs
++++ b/Src/MiEditor.Shared/Models/Toolbar/MeasureTool.cs
+@@ -14,10 +14,11 @@ public readonly struct MeasureTool : ITool, IEquatable<MeasureTool>
+ 
+     public static IEnumerable<MeasureTool> All => [Distance, Area, SheepMovementBuffer];
+ 
+-    public override string ToString() => Name;
++    public override string ToString() => Name ?? string.Empty;
+     public bool Equals(MeasureTool other) => Name == other.Name;
+     public override bool Equals(object? obj) => obj is MeasureTool other && Equals(other);
+-    public override int GetHashCode() => Name.GetHashCode();
++    // A default (unselected) tool has a null Name; hashing it must not throw.
++    public override int GetHashCode() => Name?.GetHashCode() ?? 0;
+     public static bool operator ==(MeasureTool left, MeasureTool right) => left.Equals(right);
+     public static bool operator !=(MeasureTool left, MeasureTool right) => !left.Equals(right);
+ }
+diff --git a/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs b/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs
+index b1f8eb87156d5519b666bb5ce3cd9e998acf3040..769c2784202d79ed93b4be8ba504100224374c09 100644
+--- a/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs
++++ b/Src/MiEditor.Shared/Models/Toolbar/StandardTool.cs
+@@ -24,10 +24,11 @@ public readonly struct StandardTool : ITool, IEquatable<StandardTool>
+         NextView
+     ];
+ 
+-    public override string ToString() => Name;
++    public override string ToString() => Name ?? string.Empty;
+     public bool Equals(StandardTool other) => Name == other.Name;
+     public override bool Equals(object? obj) => obj is StandardTool other && Equals(other);
+-    public override int GetHashCode() => Name.GetHashCode();
++    // A default (unselected) tool has a null Name; hashing it must not throw.
++    public override int GetHashCode() => Name?.GetHashCode() ?? 0;
+     public static bool operator ==(StandardTool left, StandardTool right) => left.Equals(right);
+     public static bool operator !=(StandardTool left, StandardTool right) => !left.Equals(right);
+ }
+diff --git a/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolDefaultValueTests.cs b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolDefaultValueTests.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..4ae78feaaa5b58af82e5db8db10da1b13505a0f1
+--- /dev/null
++++ b/Tests/MiEditor.MainApp.Tests/ViewModels/Toolbar/ToolDefaultValueTests.cs
+@@ -0,0 +1,49 @@
++using WG.MiEditor.Shared.Models.Toolbar;
++using Xunit;
++
++namespace WG.MiEditor.MainApp.Tests.ViewModels.Toolbar;
++
++// "No tool selected" is represented by a default tool value (e.g. AoiControl resets with
++// ActiveTool = new()). Its Name is null, and GetHashCode used to throw NullReferenceException,
++// so putting one in a dictionary or HashSet crashed.
++public class ToolDefaultValueTests
++{
++    [Fact]
++    public void DefaultTools_CanBeHashed_AndPrinted()
++    {
++        AssertSafe(new AoiTool());
++        AssertSafe(new MeasureTool());
++        AssertSafe(new EditingTool());
++        AssertSafe(new StandardTool());
++    }
++
++    [Fact]
++    public void DefaultTool_EqualsOnlyItself()
++    {
++        Assert.Equal(new AoiTool(), new AoiTool());
++        Assert.NotEqual(new AoiTool(), AoiTool.DrawAOI);
++        Assert.Equal(new AoiTool().GetHashCode(), new AoiTool().GetHashCode());
++    }
++
++    [Fact]
++    public void DefaultTool_WorksAsASetMember()
++    {
++        var set = new HashSet<AoiTool> { new(), AoiTool.DrawAOI };
++
++        Assert.Contains(new AoiTool(), set);
++        Assert.Contains(AoiTool.DrawAOI, set);
++    }
++
++    [Fact]
++    public void NamedTools_StillHashByName()
++    {
++        Assert.Equal(AoiTool.DrawAOI.Name.GetHashCode(), AoiTool.DrawAOI.GetHashCode());
++        Assert.Equal("DrawAOI", AoiTool.DrawAOI.ToString());
++    }
++
++    private static void AssertSafe<T>(T tool) where T : struct
++    {
++        _ = tool.GetHashCode();
++        Assert.Equal(string.Empty, tool.ToString());
++    }
++}
