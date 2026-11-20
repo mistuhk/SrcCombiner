@@ -3,7 +3,26 @@
 Registers `MapViewService` and `DrawingSymbolColourParserService` as `Singleton` instead of
 `Scoped`.
 
-Apply after `measure-tools`.
+## Apply order
+
+Step 2 of 5. Previous: `measure-tools`. Next: `symbol-config-safety`.
+
+Needs first: `measure-tools`. Both change `DrawingSymbolColourParserService.cs`.
+
+Full order:
+
+1. `measure-tools`
+2. `singleton-lifetimes` (this package)
+3. `symbol-config-safety`
+4. `sketch-point-style`
+5. `tool-default-hash`
+
+From the repository root:
+
+    git apply migrations/singleton-lifetimes/singleton-lifetimes.patch
+
+If it fails on a Windows checkout, retry with `--ignore-whitespace` (the patches use LF line
+endings). See `../CHECKPOINT.md` for the full steps and what to do if a patch will not apply.
 
 ## Why
 

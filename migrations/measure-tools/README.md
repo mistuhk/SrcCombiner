@@ -3,7 +3,26 @@
 Makes the Distance, Area and Sheep Movement Buffer measure tools resilient in day to day use, and
 replaces the `MeasureOperationBase` inheritance hierarchy with small composed parts.
 
-Apply first. Later packages build on these files.
+## Apply order
+
+Step 1 of 5. Previous: none, this is the first. Next: `singleton-lifetimes`.
+
+Needs first: Nothing. Patches 2 to 4 build on files this one changes, so it must go first.
+
+Full order:
+
+1. `measure-tools` (this package)
+2. `singleton-lifetimes`
+3. `symbol-config-safety`
+4. `sketch-point-style`
+5. `tool-default-hash`
+
+From the repository root:
+
+    git apply migrations/measure-tools/measure-tools.patch
+
+If it fails on a Windows checkout, retry with `--ignore-whitespace` (the patches use LF line
+endings). See `../CHECKPOINT.md` for the full steps and what to do if a patch will not apply.
 
 ## Faults fixed
 

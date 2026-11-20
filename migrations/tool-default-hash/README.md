@@ -2,7 +2,26 @@
 
 A default tool value no longer throws from `GetHashCode()`.
 
-Independent of the other packages; listed last.
+## Apply order
+
+Step 5 of 5. Previous: `sketch-point-style`. Next: none, this is the last.
+
+Needs first: Nothing. It touches no file the other packages change, so it applies at any point, but it is listed last to keep one order.
+
+Full order:
+
+1. `measure-tools`
+2. `singleton-lifetimes`
+3. `symbol-config-safety`
+4. `sketch-point-style`
+5. `tool-default-hash` (this package)
+
+From the repository root:
+
+    git apply migrations/tool-default-hash/tool-default-hash.patch
+
+If it fails on a Windows checkout, retry with `--ignore-whitespace` (the patches use LF line
+endings). See `../CHECKPOINT.md` for the full steps and what to do if a patch will not apply.
 
 ## The fault
 

@@ -2,7 +2,26 @@
 
 `AddSketchPointOperation` draws with the `InFieldSketchPoint` style instead of `Point`.
 
-Apply after `symbol-config-safety`, which introduced the `MarkerSymbol` call this changes.
+## Apply order
+
+Step 4 of 5. Previous: `symbol-config-safety`. Next: `tool-default-hash`.
+
+Needs first: `symbol-config-safety`, which adds the `MarkerSymbol(...)` call in `AddSketchPointOperation.cs` that this patch changes.
+
+Full order:
+
+1. `measure-tools`
+2. `singleton-lifetimes`
+3. `symbol-config-safety`
+4. `sketch-point-style` (this package)
+5. `tool-default-hash`
+
+From the repository root:
+
+    git apply migrations/sketch-point-style/sketch-point-style.patch
+
+If it fails on a Windows checkout, retry with `--ignore-whitespace` (the patches use LF line
+endings). See `../CHECKPOINT.md` for the full steps and what to do if a patch will not apply.
 
 ## Why
 

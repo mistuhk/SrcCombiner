@@ -4,7 +4,26 @@ A mistake in `drawingsymbols.json` no longer crashes the tool that reads it. Bad
 colours, styles, sizes and whole sections each log a warning naming the setting and fall back to
 a default.
 
-Apply after `singleton-lifetimes`.
+## Apply order
+
+Step 3 of 5. Previous: `singleton-lifetimes`. Next: `sketch-point-style`.
+
+Needs first: `singleton-lifetimes`. It changes `DrawingSymbolColourParserService.cs` again, and `AoiControlViewModel.cs` and `MeasurementSymbols.cs` as `measure-tools` left them.
+
+Full order:
+
+1. `measure-tools`
+2. `singleton-lifetimes`
+3. `symbol-config-safety` (this package)
+4. `sketch-point-style`
+5. `tool-default-hash`
+
+From the repository root:
+
+    git apply migrations/symbol-config-safety/symbol-config-safety.patch
+
+If it fails on a Windows checkout, retry with `--ignore-whitespace` (the patches use LF line
+endings). See `../CHECKPOINT.md` for the full steps and what to do if a patch will not apply.
 
 ## Faults fixed
 

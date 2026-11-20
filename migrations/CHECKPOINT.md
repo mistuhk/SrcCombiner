@@ -24,14 +24,56 @@ against the state before it, and a README explaining the decisions. Four files a
 packages, so apply in order: `DrawingSymbolColourParserService.cs`, `AoiControlViewModel.cs`,
 `MeasurementSymbols.cs` and `AddSketchPointOperation.cs`.
 
-Apply from the repository root:
+## How to apply
 
-    patch -p1 -E < migrations/<folder>/<folder>.patch
-    # or
-    git apply migrations/<folder>/<folder>.patch
+Do not apply these patches to `/Users/mistuhkay/Downloads/mi-editor-net10`; that copy already has
+all five applied. Use them only on a copy without the changes.
 
-Deletions are in the `measure-tools` patch only. If copying `files/` instead, delete
-`MeasureOperationBase.cs` and `MeasureToolToIconConverter.cs` by hand.
+### Order and why
+
+| Step | Patch | Needs first | Reason |
+| --- | --- | --- | --- |
+| 1 | `measure-tools/measure-tools.patch` | nothing | |
+| 2 | `singleton-lifetimes/singleton-lifetimes.patch` | 1 | Both change `DrawingSymbolColourParserService.cs` |
+| 3 | `symbol-config-safety/symbol-config-safety.patch` | 2 | Changes `DrawingSymbolColourParserService.cs` again, plus `AoiControlViewModel.cs` and `MeasurementSymbols.cs` as patch 1 left them |
+| 4 | `sketch-point-style/sketch-point-style.patch` | 3 | Changes the `MarkerSymbol(...)` call that patch 3 adds to `AddSketchPointOperation.cs` |
+| 5 | `tool-default-hash/tool-default-hash.patch` | nothing | Independent; applied last by convention |
+
+### Steps
+
+Run from the repository root (the folder with `WG.MiEditor.sln`), with `migrations/` copied into it.
+On Windows, use Git Bash or PowerShell.
+
+1. Check patch 1 without changing anything. Patches 2 to 4 cannot be checked this way until the
+   earlier patches are applied.
+
+       git apply --check migrations/measure-tools/measure-tools.patch
+
+2. Apply them one at a time, in order, and stop at the first error:
+
+       git apply migrations/measure-tools/measure-tools.patch
+       git apply migrations/singleton-lifetimes/singleton-lifetimes.patch
+       git apply migrations/symbol-config-safety/symbol-config-safety.patch
+       git apply migrations/sketch-point-style/sketch-point-style.patch
+       git apply migrations/tool-default-hash/tool-default-hash.patch
+
+   `git apply` applies each patch completely or not at all, so a failure changes no files. Without
+   git, `patch -p1 -E < migrations/<folder>/<folder>.patch` works in the same order.
+
+3. Build the solution and run the tests.
+
+### If a patch fails
+
+- **Line endings.** The patches use LF line endings. On a Windows checkout with CRLF line endings
+  (for example with git's `core.autocrlf` on), every hunk fails even when the code matches. Retry
+  that patch with:
+
+      git apply --ignore-whitespace migrations/<folder>/<folder>.patch
+
+- **Other failures.** Do not apply part of a patch by hand. Copy that package's `files/` folder over
+  the repository instead; it holds the complete changed files at their real paths. Patch 1 deletes
+  `MeasureOperationBase.cs` and `MeasureToolToIconConverter.cs`. If `measure-tools` is applied by
+  copying `files/`, delete those two by hand. Copy the packages in the same order as the patches.
 
 ## How the patches were made
 
@@ -55,10 +97,27 @@ Starting from those originals, applying all five patches in order with `patch -p
 If a hunk fails against another copy of the repository, that copy differs from this one in that
 spot. `files/` holds the full intended file in that case.
 
+## Re-applied to the latest source (2026-11-19)
+
+The source was replaced with a newer version, and all five patches were applied to it again, in order,
+with no failed hunks. That source differed from the originals in only two spots
+(`GeometryEditor!.Stop()` in `AoiControlViewModel`, a leading blank line in
+`LiveMeasurementViewModel`), and both were kept.
+
+Compiled on macOS with `EnableWindowsTargeting`, against Esri.ArcGISRuntime 200.8.3 and
+CommunityToolkit.Mvvm 8.4.2. The repository's own `Directory.Build.props` and
+`Directory.Packages.props` are not in this copy, so `ImplicitUsings` and these versions were assumed.
+
+- Core and Core.Tests: 0 errors before and after.
+- MainApp and MainApp.Tests, compiled without the MAUI workload: the same 82 XAML codegen errors
+  (`InitializeComponent`, x:Name fields) before and after, and no new errors.
+- Every name bound in the changed views' XAML exists on its view model.
+- Core.Tests run on macOS: no test that passed before fails now. 80 of the 101 new tests pass; the
+  other 21 need the native Esri runtime, which only exists on Windows.
+
 ## Still to do
 
-- Build and run the tests on Windows. 157 tests pass in a macOS scratch project that stubs the Esri
-  and MAUI types; the Esri dependent code and tests were not compiled.
+- Build and run the tests on Windows. The XAML compiler and MainApp.Tests have not run.
 - Manual checks are listed in `measure-tools/README.md`.
 - Confirm the sketch point colour change is wanted (`sketch-point-style/README.md`).
 - Optional: rename `IDrawingSymbolColourParser`, which now builds whole symbols.
